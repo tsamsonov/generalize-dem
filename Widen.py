@@ -8,7 +8,6 @@ import arcpy, sys, traceback, FilterDEM, time, os
 def execute(demdataset, streams, distance, windowsize, output, ftype):
     arcpy.env.workspace = "in_memory"
     arcpy.env.snapRaster = demdataset
-    #desc = arcpy.Describe(dem + "/Band_1")
     dem = Raster(demdataset)
     cellsize = dem.meanCellHeight
 
@@ -36,11 +35,6 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
 
     # Get valley and ridge values
     arcpy.AddMessage("Filtering elevations...")
-
-    # unique time identifier
-    # t = int(round(time.time() * 1000))
-    valleys = None
-    ridges = None
     
     if(ftype == "Min/Max"):
         neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
@@ -74,7 +68,6 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
 
     # Save the result
     mixall.save(output)
-    arcpy.AddMessage("Done")
 
 if __name__ == "__main__":
     try:
