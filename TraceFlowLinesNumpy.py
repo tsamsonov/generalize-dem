@@ -1,99 +1,102 @@
 # -*- coding: cp1251 -*-
 # Raster stream network generalization by Leonowicz-Jenny algorithm
-# 2010, Timofey Samsonov, Lomonosov Moscow State University
+# 2017, Timofey Samsonov, Lomonosov Moscow State University
 import arcpy, numpy, sys, traceback, os.path
 
 MAXACC = 0
 
-def findUpCell(accRaster, i, j):
-    w = [[0.70710678, 1, 0.70710678],[1, 1, 1], [0.70710678, 1, 0.70710678]] ## distance weights
+
+def find_up_cell(accraster, i, j):
+    w = [[0.70710678, 1, 0.70710678],[1, 1, 1], [0.70710678, 1, 0.70710678]]  # distance weights
     shift = [-1, 0, 1]
     minmax = 4000000000
     a = 0
     kmin = 1
     lmin = 1
 
-    ## finding differences in 3x3 neighbourhood
+    # finding differences in 3x3 neighbourhood
 
     for k in shift:
         b = 0
         ik = i+k
         for l in shift:
             jl = j+l
-            temp = (accRaster[i, j] - accRaster[ik, jl]) * w[a][b]
+            temp = (accraster[i, j] - accraster[ik, jl]) * w[a][b]
             if 0 < temp < minmax:
                 minmax = temp 
                 kmin = a
                 lmin = b      
-            b+=1
-        a+=1 
+            b += 1
+        a += 1
 
     iUp = i + shift[kmin]
     jUp = j + shift[lmin]
 
     return iUp, jUp
 
-def traceFlowCells(accRaster, streamRaster, i, j, stream, minAcc, minLen):
-    acc = accRaster[i, j]
+
+def trace_flow_cells(accraster, streamraster, i, j, stream, minacc, minlen):
+    acc = accraster[i, j]
     ik = i
     jk = j
     n = 0
     
-    while n < minLen:
+    while n < minlen:
         stream[n] = [ik, jk]
-        iUp, jUp = findUpCell(accRaster, ik, jk)
-        acc = accRaster[iUp, jUp]
-        if acc < minAcc:
+        iup, jup = find_up_cell(accraster, ik, jk)
+        acc = accraster[iup, jup]
+        if acc < minacc:
             break
-        if iUp == ik and jUp == jk:
+        if iup == ik and jup == jk:
             break
-        ik = iUp
-        jk = jUp
-        n+=1
+        ik = iup
+        jk = jup
+        n += 1
     
-    if n == minLen:
+    if n == minlen:
         for k in range(n):
-            streamRaster[stream[k][0], stream[k][1]] = 1
-        while acc > minAcc:
-            streamRaster[iUp, jUp] = 1
-            iUp, jUp = findUpCell(accRaster, ik, jk)
-            if iUp == ik and jUp == jk:
+            streamraster[stream[k][0], stream[k][1]] = 1
+        while acc > minacc:
+            streamraster[iup, jup] = 1
+            iup, jup = find_up_cell(accraster, ik, jk)
+            if iup == ik and jup == jk:
                 break
-            acc = accRaster[iUp, jUp]
-            ik = iUp
-            jk = jUp
-            n+=1
+            acc = accraster[iup, jup]
+            ik = iup
+            jk = jup
+            n += 1
 
-    return streamRaster 
+    return streamraster
 
-def extendArray(array, nx, ny, value):
+
+def extend_array(array, nx, ny, value):
     
     ni = array.shape[0]
     nj = array.shape[1]
 
-    extArray = numpy.empty((ni+ny, nj+nx))
-    extArray.fill(value)
+    extarray = numpy.empty((ni+ny, nj+nx))
+    extarray.fill(value)
     for i in range(ni):
         for j in range(nj):
-            extArray[i, j] = array[i, j]
+            extarray[i, j] = array[i, j]
 
-    return extArray
-        
-def processRaster(inRaster, minAcc, minLen):
-    # raster processing here
+    return extarray
+
+
+def process_raster(inraster, minacc, minlen):
 
     arcpy.AddMessage("Streaming...")
-    stream = [[0, 0] for i in range(minLen)]
-    ni = inRaster.shape[0]
-    nj = inRaster.shape[1]
+    stream = [[0, 0] for i in range(minlen)]
+    ni = inraster.shape[0]
+    nj = inraster.shape[1]
 
     global MAXACC
 
     arcpy.AddMessage("Zeroing...")
-    outRaster = numpy.zeros((ni, nj))
+    outraster = numpy.zeros((ni, nj))
 
     arcpy.AddMessage("Extending...")
-    extInRaster = extendArray(inRaster, 1, 1, MAXACC * 10)
+    extinraster = extend_array(inraster, 1, 1, MAXACC * 10)
 
     arcpy.AddMessage("Tracing...")
 
@@ -101,43 +104,43 @@ def processRaster(inRaster, minAcc, minLen):
     for i in range(ni):
         arcpy.SetProgressorLabel("Processing row " + str(i) + " from " + str(ni))
         for j in range(nj):
-            if inRaster[i, j] > minAcc:
-                traceFlowCells(extInRaster, outRaster, i, j, stream, minAcc, minLen)
+            if inraster[i, j] > minacc:
+                trace_flow_cells(extinraster, outraster, i, j, stream, minacc, minlen)
         arcpy.SetProgressorPosition(i)
 
-    return outRaster
+    return outraster
 
 
-def execute(inRaster, outRaster, minAcc, minLen, workspace):
+def execute(inraster, outraster, minacc, minlen, workspace):
     # scratch workspace MUST be a folder, not a geodatabase
     n = len(workspace)
-    if(n==0):
-        workspace = os.path.dirname(outRaster)
+    if n == 0:
+        workspace = os.path.dirname(outraster)
         n = len(workspace)
-    if(n > 4):
+    if n > 4:
         end = workspace[n-4 : n] # extract last 4 letters
-        if(end == ".gdb"): # geodatabase
+        if end == ".gdb": # geodatabase
             workspace = os.path.dirname(workspace)
 
     global MAXACC
-    MAXACC = float(str(arcpy.GetRasterProperties_management(inRaster, "MAXIMUM")))
+    MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
 
-    rasterNumpy = arcpy.RasterToNumPyArray(inRaster)
+    rasternumpy = arcpy.RasterToNumPyArray(inraster)
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing stream lines...")
-    newRasterNumpy = processRaster(rasterNumpy, minAcc, minLen)
+    newrasternumpy = process_raster(rasternumpy, minacc, minlen)
 
-    r = arcpy.Raster(inRaster)
-    lowerLeft = arcpy.Point(r.extent.XMin, r.extent.YMin)
-    cellSize = r.meanCellWidth
+    r = arcpy.Raster(inraster)
+    lowerleft = arcpy.Point(r.extent.XMin, r.extent.YMin)
+    cellsize = r.meanCellWidth
     crs = r.spatialReference
 
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
-    outInnerRaster = arcpy.NumPyArrayToRaster(newRasterNumpy, lowerLeft, cellSize)
-    arcpy.DefineProjection_management(outInnerRaster, crs)
-    outInnerRaster.save(outRaster)
+    outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
+    arcpy.DefineProjection_management(outinnerraster, crs)
+    outinnerraster.save(outraster)
 
 if __name__ == "__main__":
     try:
@@ -157,4 +160,3 @@ if __name__ == "__main__":
         pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
                 str(sys.exc_type)+ ": " + str(sys.exc_value) + "\n"
         arcpy.AddError(pymsg)
-        

@@ -4,6 +4,7 @@
 import arcpy, sys, traceback, os.path
 MAXACC = 0
 
+
 def findUpCell(accRaster, i, j):
     w = [[0.70710678, 1, 0.70710678],[1, 1, 1], [0.70710678, 1, 0.70710678]] ## distance weights
     shift = [-1, 0, 1]
@@ -12,7 +13,7 @@ def findUpCell(accRaster, i, j):
     kmin = 1
     lmin = 1
 
-    ## finding differences in 3x3 neighbourhood
+    # finding differences in 3x3 neighbourhood
 
     for k in shift:
         b = 0
@@ -31,6 +32,7 @@ def findUpCell(accRaster, i, j):
     jUp = j + shift[lmin]
 
     return iUp, jUp
+
 
 def traceFlowCells(accRaster, streamRaster, i, j, stream, minAcc, minLen):
     acc = accRaster[i][j]

@@ -1,14 +1,20 @@
-__author__ = 'Timofey Samsonov'
 # -*- coding: cp1251 -*-
 # Raster DEM widening by modified Leonowicz-Jenny algorithm
 # 2014, Timofey Samsonov, Lomonosov Moscow State University
+import os
+import arcpy
+import sys
+import traceback
+import FilterDEM
 from arcpy.sa import *
-import arcpy, sys, traceback, FilterDEM, time, os
+
+__author__ = 'Timofey Samsonov'
+
 
 def execute(demdataset, streams, distance, windowsize, output, ftype):
     arcpy.env.workspace = "in_memory"
     arcpy.env.snapRaster = demdataset
-    dem = Raster(demdataset)
+    dem = arcpy.sa.Raster(demdataset)
     cellsize = dem.meanCellHeight
 
     # Calculate distances from streams
@@ -36,24 +42,24 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
     # Get valley and ridge values
     arcpy.AddMessage("Filtering elevations...")
     
-    if(ftype == "Min/Max"):
+    if ftype == "Min/Max":
         neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
         valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
         ridges = FocalStatistics(dem, neighborhood, "MAXIMUM", "DATA")
     else:
         workspace = os.path.dirname(output)
         n = len(workspace)
-        if(n > 4):
+        if n > 4:
             end = workspace[n-4 : n] # extract last 4 letters
-            if(end == ".gdb"): # geodatabase
+            if end == ".gdb": # geodatabase
                 workspace = os.path.dirname(workspace)
                 
         val = arcpy.env.workspace + "val"
         rig = arcpy.env.workspace + "rig"
         FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile", workspace)
         FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile", workspace)
-        valleys = Raster(val)
-        ridges = Raster(rig)
+        valleys = arcpy.sa.Raster(val)
+        ridges = arcpy.sa.Raster(rig)
         
     # Calculate weighted values
     arcpy.AddMessage("Calculating weighted values...")

@@ -1,4 +1,3 @@
-__author__ = 'Timofey Samsonov'
 # -*- coding: cp1251 -*-
 # DEM generalization algorithm
 # Important note:  Widen and TraceFlowLines scripts must be in the same directory,
@@ -8,6 +7,7 @@ __author__ = 'Timofey Samsonov'
 import arcpy, math
 from arcpy.sa import *
 import os.path, TraceFlowLines, Widen
+__author__ = 'Timofey Samsonov'
 
 arcpy.CheckOutExtension("3D")
 arcpy.CheckOutExtension("Spatial")
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     arcpy.env.scratchWorkspace = rastertinworkspace
     arcpy.env.workspace = arcpy.env.scratchWorkspace
 
-    demsource = Raster(demdataset)
+    demsource = arcpy.sa.Raster(demdataset)
 
     nrows = math.ceil(demsource.height/tilesize)
     ncols = math.ceil(demsource.width/tilesize)
@@ -102,7 +102,7 @@ if __name__ == '__main__':
             arcpy.AddMessage('---')
             arcpy.AddMessage('GENERALIZING DEM ' + str(i+1) + ' FROM ' + str(N))
 
-            dem0 = Raster(rastertinworkspace + '/' + raster)
+            dem0 = arcpy.sa.Raster(rastertinworkspace + '/' + raster)
             dem = dem0
 
             marine_area = None
@@ -115,7 +115,7 @@ if __name__ == '__main__':
                     arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
                     dem = ExtractByMask(dem0, cell_erased)
                     dem.save(rastertinworkspace + '/' + raster + "_e")
-                    dem = Raster(rastertinworkspace + '/' + raster + "_e")
+                    dem = arcpy.sa.Raster(rastertinworkspace + '/' + raster + "_e")
                     process_marine = True
 
             cellsize = dem.meanCellHeight
@@ -290,7 +290,7 @@ if __name__ == '__main__':
                 Widen.execute(rastertin, streams1, widendist, filtersize, widenraster, widentype)
 
             # Smooth DEM
-            result = Raster(widenraster)
+            result = arcpy.sa.Raster(widenraster)
             if is_smooth == "true":
                 arcpy.AddMessage("Raster filtering...")
                 neighborhood = NbrRectangle(filtersize, filtersize, "CELL")
@@ -301,7 +301,7 @@ if __name__ == '__main__':
                 result_erased = ExtractByMask(result, cell_erased)
                 arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
                 arcpy.AddMessage("Saving result...")
-                res = Raster(rastertin)
+                res = arcpy.sa.Raster(rastertin)
                 res.save(rastertinworkspace+'/gen/dem'+str(i))
 
             else:
@@ -362,7 +362,7 @@ if __name__ == '__main__':
     i = 0
     for row in rows:
 
-        dem = Raster(rastertinworkspace+'/gen/dem'+str(i))
+        dem = arcpy.sa.Raster(rastertinworkspace+'/gen/dem'+str(i))
         dem_clipped = ExtractByMask(dem, row[0])
         dem_clipped.save(rastertinworkspace+'/gencrop/dem'+str(i))
         i+=1
