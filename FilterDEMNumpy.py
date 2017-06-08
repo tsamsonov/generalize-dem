@@ -145,18 +145,19 @@ def execute(inraster, outraster, wsize, niter, qtype):
     window = [0 for i in range(corrected_size**2)]
 
     # Select the appropriate filter number
+
     nfilt = 0
-    if(qtype == "Lower Quartile"):
+    if qtype == "Lower Quartile":
         nfilt = 0
-    elif(qtype == "Upper Quartile"):
+    elif qtype == "Upper Quartile":
         nfilt = 1
-    elif(qtype == "Min"):
+    elif qtype == "Min":
         nfilt = 2
-    elif(qtype == "Max"):
+    elif qtype == "Max":
         nfilt = 3
-    elif(qtype == "Mean"):
+    elif qtype == "Mean":
         nfilt = 4
-    elif(qtype == "Median"):
+    elif qtype == "Median":
         nfilt = 5
     else:
         nfilt = 4
