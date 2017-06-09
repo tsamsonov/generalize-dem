@@ -34,5 +34,3 @@ For more details of the algorithm please read this article:
 Anna M. Leonowicz, Bernhard Jenny, Lorenz Hurni, Automatic generation of hypsometric layers for small-scale maps, Computers & Geosciences, Volume 35, Issue 10, October 2009, Pages 2074-2083, ISSN 0098-3004, http://dx.doi.org/10.1016/j.cageo.2008.12.012
 
 FILTER DEM tool implements focal statistics filtering for raster datasets. It includes several standard filters including mean, median, min, max and also low and high quartile filters that can be useful in DEM generalization. Another useful feature is the possibility to make several iterations
-
-2015, Timofey Samsonov, Lomonosov MSU Faculty of Geography
