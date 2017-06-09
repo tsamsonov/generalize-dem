@@ -1,6 +1,6 @@
 # -*- coding: cp1251 -*-
 # DEM generalization algorithm
-# 2015-2017 Timofey Samsonov, Lomonosov Moscow State University
+# 2011-2017 Timofey Samsonov, Lomonosov Moscow State University
 
 import arcpy
 import numpy
@@ -35,6 +35,14 @@ class Filter:
         self.window = [0 for i in range(corrected_size ** 2)]
         self.nodata = nodata
 
+        self.filters = {'Min': self.calc_min,
+                        'Max': self.calc_max,
+                        'Mean': self.calc_mean,
+                        'Median': self.calc_median,
+                        'Lower Quartile': self.calc_lower_quartile,
+                        'Upper Quartile': self.calc_upper_quartile
+        }
+
     def sample_window(self, raster, i, j):
         w = 0
         for k in self.shift:
@@ -48,27 +56,27 @@ class Filter:
         return elems
 
     # nfilt = 0
-    def lower_quartile(self, raster, i, j):
+    def calc_lower_quartile(self, raster, i, j):
         elems = self.sample_window(raster, i, j)
         elems.sort()
         n = int(math.floor(len(elems) / 4))
         return 0.5 * (elems[n] + elems[n - 1])
 
     # nfilt = 1
-    def upper_quartile(self, raster, i, j):
+    def calc_upper_quartile(self, raster, i, j):
         elems = self.sample_window(raster, i, j)
         elems.sort(reverse=True)
         n = int(math.floor(len(elems) / 4))
         return 0.5 * (elems[n] + elems[n - 1])
 
     # nfilt = 2
-    def min(self, raster, i, j):
+    def calc_min(self, raster, i, j):
         elems = self.sample_window(raster, i, j)
         value = min(elems)
         return value
 
     # nfilt = 3
-    def max(self, raster, i, j):
+    def calc_max(self, raster, i, j):
         elems = self.sample_window(raster, i, j)
         value = max(elems)
         return value
@@ -94,6 +102,9 @@ class Filter:
         else:
             return (elems[n // 2 - 1] + elems[n // 2]) * 0.5
 
+    def filter(self, raster, i, j, ftype):
+        return self.filters[ftype](raster, i, j)
+
 class Toolbox(object):
     def __init__(self):
         """Define the toolbox (the name of the toolbox is the name of the
@@ -102,7 +113,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [ExtractStreams, FilterDEM, WidenDEM, GeneralizeDEM]
+        self.tools = [ExtractStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
 
 
 class ExtractStreams(object):
@@ -119,7 +130,7 @@ class ExtractStreams(object):
         in_raster = arcpy.Parameter(
             displayName="Input flow accumulation raster",
             name="in_raster",
-            datatype="GPRasterDataLayer",
+            datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
 
@@ -287,7 +298,7 @@ class FilterDEM(object):
         in_raster = arcpy.Parameter(
             displayName="Input raster DEM",
             name="in_raster",
-            datatype="GPRasterDataLayer",
+            datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
 
@@ -298,14 +309,6 @@ class FilterDEM(object):
             parameterType="Required",
             direction="Output")
 
-        niter = arcpy.Parameter(
-            displayName="Widening distance (in DEM projection units)",
-            name="min_acc",
-            datatype="GPLong",
-            parameterType="Required",
-            direction="Input")
-        niter.value = 1
-
         wsize = arcpy.Parameter(
             displayName="Filter size (in cells)",
             name="min_len",
@@ -314,16 +317,24 @@ class FilterDEM(object):
             direction="Input")
         wsize.value = 3
 
-        qtype = arcpy.Parameter(
-            displayName="Widening statistics",
+        niter = arcpy.Parameter(
+            displayName="Number of iterations",
+            name="min_acc",
+            datatype="GPLong",
+            parameterType="Required",
+            direction="Input")
+        niter.value = 1
+
+        ftype = arcpy.Parameter(
+            displayName="Statistics type",
             name="ftype",
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-        qtype.value = 'Min'
-        qtype.filter.list = ['Min', 'Max', 'Mean', 'Median' 'Upper Quartile', 'Lower Quartile']
+        ftype.value = 'Min'
+        ftype.filter.list = ['Min', 'Max', 'Mean', 'Median', 'Upper Quartile', 'Lower Quartile']
 
-        params = [in_raster, out_raster, wsize, niter, qtype]
+        params = [in_raster, out_raster, wsize, niter, ftype]
         return params
 
     def isLicensed(self):
@@ -335,7 +346,7 @@ class FilterDEM(object):
     def updateMessages(self, parameters):
         return
 
-    def process_raster(self, inraster, niter, nfilt, wsize, nodata):
+    def process_raster(self, inraster, niter, ftype, wsize, nodata):
 
         ni = inraster.shape[0]
         nj = inraster.shape[1]
@@ -347,13 +358,6 @@ class FilterDEM(object):
 
         # Filter selector
         flt = Filter(wsize, nodata)
-        filters = {0: flt.calc_min,
-                   1: flt.calc_max,
-                   2: flt.calc_mean,
-                   3: flt.calc_median,
-                   4: flt.calc_lower_quartile,
-                   5: flt.calc_upper_quartile
-        }
 
         for k in range(niter):
             raster = Tools.extend_array(raster, wsize - 1, wsize - 1, nodata)
@@ -365,31 +369,14 @@ class FilterDEM(object):
                     if raster[i, j] == nodata:
                         outraster[i, j] = raster[i, j]
                     else:
-                        outraster[i, j] = filters[nfilt](raster, i, j)
+                        outraster[i, j] = flt.filter(raster, i, j, ftype)
                 arcpy.SetProgressorPosition(i)
             raster = outraster
         return outraster
 
-    def call(self, inraster, outraster, wsize, niter, qtype):
+    def call(self, inraster, outraster, wsize, niter, ftype):
 
         self.wsize = wsize
-
-        # Select the appropriate filter number
-        nfilt = 0
-        if qtype == "Min":
-            nfilt = 0
-        elif qtype == "Max":
-            nfilt = 1
-        elif qtype == "Mean":
-            nfilt = 2
-        elif qtype == "Median":
-            nfilt = 3
-        elif qtype == "Lower Quartile":
-            nfilt = 4
-        elif qtype == "Upper Quartile":
-            nfilt = 5
-        else:
-            nfilt = 0
 
         r = arcpy.Raster(inraster)
         lowerleft = arcpy.Point(r.extent.XMin, r.extent.YMin)
@@ -398,9 +385,9 @@ class FilterDEM(object):
 
         arcpy.AddMessage("Filtering raster...")
         rasternumpy = arcpy.RasterToNumPyArray(inraster)
-        newrasternumpy = self.process_raster(rasternumpy, niter, nfilt, wsize, r.noDataValue)
+        newrasternumpy = self.process_raster(rasternumpy, niter, ftype, wsize, r.noDataValue)
 
-        arcpy.AddMessage("Writing streams...")
+        arcpy.AddMessage("Writing output...")
         outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
         arcpy.DefineProjection_management(outinnerraster, crs)
         outinnerraster.save(outraster)
@@ -412,9 +399,9 @@ class FilterDEM(object):
             out_raster = parameters[1].valueAsText
             wsize = int(parameters[2].valueAsText)
             niter = int(parameters[3].valueAsText)
-            qtype = parameters[4].valueAsText
+            ftype = parameters[4].valueAsText
 
-            self.call(in_raster, out_raster, wsize, niter, qtype)
+            self.call(in_raster, out_raster, wsize, niter, ftype)
         except:
             tb = sys.exc_info()[2]
             tbinfo = traceback.format_tb(tb)[0]
@@ -424,10 +411,10 @@ class FilterDEM(object):
         return
 
 
-class WidenDEM(object):
+class WidenLandforms(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Widen Valleys and Ridges"
+        self.label = "Widen Landforms"
         self.description = ""
         self.canRunInBackground = True
 
@@ -435,17 +422,10 @@ class WidenDEM(object):
         """Define parameter definitions"""
         inraster = arcpy.Parameter(
             displayName="Input raster DEM",
-            name="in_raster",
-            datatype="GPRasterDataLayer",
+            name="inraster",
+            datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
-
-        outraster = arcpy.Parameter(
-            displayName="Output raster DEM",
-            name="out_raster",
-            datatype="DERasterDataset",
-            parameterType="Required",
-            direction="Output")
 
         streams = arcpy.Parameter(
             displayName="Input streams feature layer",
@@ -454,19 +434,28 @@ class WidenDEM(object):
             parameterType="Required",
             direction="Input")
 
+        outraster = arcpy.Parameter(
+            displayName="Output raster DEM",
+            name="outraster",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Output")
+
         distance = arcpy.Parameter(
             displayName="Widening distance (in DEM projection units)",
-            name="min_acc",
+            name="distance",
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
+        distance.value = 1000
 
         windowsize = arcpy.Parameter(
             displayName="Filter size (in cells)",
-            name="min_len",
+            name="windowsize",
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
+        windowsize.value = 3
 
         ftype = arcpy.Parameter(
             displayName="Widening statistics",
@@ -474,11 +463,10 @@ class WidenDEM(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input")
-
         ftype.value = 'Min/Max'
         ftype.filter.list = ['Min/Max', 'Lower/Upper Quartile']
 
-        params = [inraster, streams, distance, windowsize, outraster, ftype]
+        params = [inraster, streams, outraster, distance, windowsize, ftype]
         return params
 
     def isLicensed(self):
@@ -555,8 +543,8 @@ class WidenDEM(object):
     def execute(self, parameters, messages):
 
         demdataset = parameters[0].valueAsText
-        output = parameters[1].valueAsText
-        streams = parameters[2].valueAsText
+        streams = parameters[1].valueAsText
+        output = parameters[2].valueAsText
         distance = float(parameters[3].valueAsText)
         windowsize = int(parameters[4].valueAsText)
         ftype = parameters[5].valueAsText
@@ -569,16 +557,16 @@ class WidenDEM(object):
 class GeneralizeDEM(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Tool"
+        self.label = "Generalize DEM"
         self.description = ""
-        self.canRunInBackground = False
+        self.canRunInBackground = True
 
     def getParameterInfo(self):
 
         demdataset = arcpy.Parameter(
             displayName="Input raster DEM",
             name="in_raster",
-            datatype="GPRasterDataLayer",
+            datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
         demdataset.category = 'Input and output'
@@ -606,6 +594,7 @@ class GeneralizeDEM(object):
             parameterType="Required",
             direction="Input")
         outputcellsize.category = 'Main parameters'
+        outputcellsize.value = 1000
 
         minacc1 = arcpy.Parameter(
             displayName="Minimum primary flow accumulation",
@@ -614,6 +603,7 @@ class GeneralizeDEM(object):
             parameterType="Required",
             direction="Input")
         minacc1.category = 'Main parameters'
+        minacc1.value = 40
 
         minlen1 = arcpy.Parameter(
             displayName="Minimum primary flow length",
@@ -621,7 +611,8 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        minacc1.category = 'Main parameters'
+        minlen1.category = 'Main parameters'
+        minlen1.value = 40
 
         minacc2 = arcpy.Parameter(
             displayName="Minimum secondary flow accumulation",
@@ -630,6 +621,7 @@ class GeneralizeDEM(object):
             parameterType="Required",
             direction="Input")
         minacc2.category = 'Main parameters'
+        minacc2.value = 20
 
         minlen2 = arcpy.Parameter(
             displayName="Minimum secondary flow length",
@@ -638,6 +630,7 @@ class GeneralizeDEM(object):
             parameterType="Required",
             direction="Input")
         minlen2.category = 'Main parameters'
+        minlen2.value = 10
 
         is_widen = arcpy.Parameter(
             displayName="Widen DEM",
@@ -646,7 +639,7 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         is_widen.category = 'Widening and smoothing'
-        is_widen = True
+        is_widen.value = 'true'
 
         widentype = arcpy.Parameter(
             displayName="Widening method",
@@ -665,7 +658,7 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         widendist.category = 'Widening and smoothing'
-        widendist.value = 1000
+        widendist.value = 8000
 
         filtersize = arcpy.Parameter(
             displayName="Widening filter size",
@@ -674,7 +667,7 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         filtersize.category = 'Widening and smoothing'
-        filtersize.value = 5
+        filtersize.value = 3
 
         is_smooth = arcpy.Parameter(
             displayName="Smooth DEM",
@@ -683,7 +676,7 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         is_smooth.category = 'Widening and smoothing'
-        is_smooth.value = False
+        is_smooth.value = 'false'
 
         is_parallel = arcpy.Parameter(
             displayName="Parallel processing",
@@ -692,15 +685,15 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         is_parallel.category = 'Parallel processing and tiling'
-        is_parallel.value = False
+        is_parallel.value = 'false'
 
         tile_size = arcpy.Parameter(
             displayName="Tile size",
-            name="is_parallel",
+            name="tile_size",
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        is_parallel.category = 'Parallel processing and tiling'
+        tile_size.category = 'Parallel processing and tiling'
         tile_size.value = 2048
 
         params = [demdataset, marine, output, outputcellsize, minacc1, minlen1, minacc2, minlen2,
@@ -996,7 +989,7 @@ class GeneralizeDEM(object):
                 if is_widen == "true":
                     arcpy.AddMessage("Raster widening...")
                     widenraster = workspace + "/widenraster"
-                    dem_widener = WidenDEM()
+                    dem_widener = WidenLandforms()
                     dem_widener.call(rastertin, streams1, widendist, filtersize, widenraster, widentype)
 
                 # Smooth DEM
