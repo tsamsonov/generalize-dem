@@ -169,13 +169,13 @@ def execute(inraster, outraster, wsize, niter, qtype):
     arcpy.AddMessage("Filtering raster...")
     newrasternumpy = process_raster(rasternumpy, niter, nfilt)
 
-    r = arcpy.Raster(inraster)
-    lowerleft = arcpy.Point(r.extent.XMin, r.extent.YMin)
-    cellsize = r.meanCellWidth
-    crs = r.spatialReference
+    desc = arcpy.Describe(inraster)
+    lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
+    cellsize = desc.meanCellWidth
+    crs = desc.spatialReference
 
     # Convert python list to ASCII
-    arcpy.AddMessage("Writing streams...")
+    arcpy.AddMessage("Writing output...")
     outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
     arcpy.DefineProjection_management(outinnerraster, crs)
     outinnerraster.save(outraster)

@@ -1,7 +1,7 @@
 # -*- coding: cp1251 -*-
 # Raster stream network generalization by Leonowicz-Jenny algorithm
 # 2017, Timofey Samsonov, Lomonosov Moscow State University
-import arcpy, numpy, sys, traceback, os.path
+import arcpy, numpy, sys, traceback
 
 MAXACC = 0
 
@@ -111,17 +111,7 @@ def process_raster(inraster, minacc, minlen):
     return outraster
 
 
-def execute(inraster, outraster, minacc, minlen, workspace):
-    # scratch workspace MUST be a folder, not a geodatabase
-    n = len(workspace)
-    if n == 0:
-        workspace = os.path.dirname(outraster)
-        n = len(workspace)
-    if n > 4:
-        end = workspace[n-4 : n] # extract last 4 letters
-        if end == ".gdb": # geodatabase
-            workspace = os.path.dirname(workspace)
-
+def execute(inraster, outraster, minacc, minlen):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
 
@@ -131,10 +121,10 @@ def execute(inraster, outraster, minacc, minlen, workspace):
     arcpy.AddMessage("Tracing stream lines...")
     newrasternumpy = process_raster(rasternumpy, minacc, minlen)
 
-    r = arcpy.Raster(inraster)
-    lowerleft = arcpy.Point(r.extent.XMin, r.extent.YMin)
-    cellsize = r.meanCellWidth
-    crs = r.spatialReference
+    desc = arcpy.Describe(inraster)
+    lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
+    cellsize = desc.meanCellWidth
+    crs = desc.spatialReference
 
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
@@ -145,15 +135,17 @@ def execute(inraster, outraster, minacc, minlen, workspace):
 if __name__ == "__main__":
     try:
 
+        arcpy.AddMessage('Reading parameters')
         # Get input parameters
         inRaster = arcpy.GetParameterAsText(0)
         outRaster = arcpy.GetParameterAsText(1)
-        minAcc = int(arcpy.GetParameterAsText(2))
-        minLen = int(arcpy.GetParameterAsText(3))
-        workspace = arcpy.GetParameterAsText(4)
+        minAcc = float(arcpy.GetParameterAsText(2))
+        minLen = long(arcpy.GetParameterAsText(3))
+
+        arcpy.AddMessage('Executing')
 
         # Execute processing
-        execute(inRaster, outRaster, minAcc, minLen, workspace)
+        execute(inRaster, outRaster, minAcc, minLen)
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]

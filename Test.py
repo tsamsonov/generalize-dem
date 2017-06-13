@@ -44,6 +44,8 @@ def get_install_path():
 
 if __name__=='__main__':
     import Test
-    oids = arcpy.GetParameterAsText(0)
+
+    arcpy.AddMessage("Receiving Parameters")
+    oids = arcpy.GetParameterAsText(0).split(';')
 
     Test.execute(oids)

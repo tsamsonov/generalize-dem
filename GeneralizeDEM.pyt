@@ -269,7 +269,6 @@ class ExtractStreams(object):
         cellsize = desc.meanCellWidth
         crs = desc.spatialReference
 
-        # Convert python list to ASCII
         arcpy.AddMessage("Writing streams...")
         outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
         arcpy.DefineProjection_management(outinnerraster, crs)
@@ -741,12 +740,6 @@ class GeneralizeDEM(object):
             arcpy.AddMessage('Counting')
             N = int(arcpy.GetCount_management(self.fishbuffer).getOutput(0))
 
-            # arcpy.AddMessage('Creating cursor')
-            #
-            # fields = arcpy.ListFields(self.fishbuffer)
-            # for field in fields:
-            #     arcpy.AddMessage(field.name)
-
             arcpy.AddMessage('Selecting cell')
             cells = arcpy.da.SearchCursor(self.fishbuffer, ['SHAPE@', 'OID@'])
             cell = cells.next()
@@ -1100,8 +1093,8 @@ class GeneralizeDEM(object):
 
             arcpy.AddMessage('Trying to make multiprocessing')
 
-            # os.system("Test.py 12")
             execute(*oids)
+
         else:
             for oid in oids:
                 self.call(oid)

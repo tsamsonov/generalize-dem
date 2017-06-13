@@ -43,23 +43,18 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
     arcpy.AddMessage("Filtering elevations...")
     
     if ftype == "Min/Max":
+        arcpy.CheckOutExtension("3D")
+        arcpy.CheckOutExtension("Spatial")
         neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
         valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
         ridges = FocalStatistics(dem, neighborhood, "MAXIMUM", "DATA")
     else:
-        workspace = os.path.dirname(output)
-        n = len(workspace)
-        if n > 4:
-            end = workspace[n-4 : n] # extract last 4 letters
-            if end == ".gdb": # geodatabase
-                workspace = os.path.dirname(workspace)
-                
         val = arcpy.env.workspace + "val"
         rig = arcpy.env.workspace + "rig"
-        FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile", workspace)
-        FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile", workspace)
-        valleys = arcpy.sa.Raster(val)
-        ridges = arcpy.sa.Raster(rig)
+        FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile")
+        FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile")
+        valleys = arcpy.Raster(val)
+        ridges = arcpy.Raster(rig)
         
     # Calculate weighted values
     arcpy.AddMessage("Calculating weighted values...")
@@ -80,7 +75,7 @@ if __name__ == "__main__":
         demdataset = arcpy.GetParameterAsText(0)
         streams = arcpy.GetParameterAsText(1)
         distance = float(arcpy.GetParameterAsText(2))
-        windowsize = long(arcpy.GetParameterAsText(3))
+        windowsize = int(arcpy.GetParameterAsText(3))
         output = arcpy.GetParameterAsText(4)
         ftype = arcpy.GetParameterAsText(5)
 
