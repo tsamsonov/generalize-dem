@@ -8,8 +8,9 @@ import sys
 import math
 import traceback
 import os.path
+import multiprocessing
 from arcpy.sa import *
-
+from Test import execute
 
 class Tools:
     @staticmethod
@@ -263,10 +264,10 @@ class ExtractStreams(object):
         arcpy.AddMessage("Tracing stream lines...")
         newrasternumpy = self.process_raster(rasternumpy, minacc, minlen)
 
-        r = arcpy.Raster(inraster)
-        lowerleft = arcpy.Point(r.extent.XMin, r.extent.YMin)
-        cellsize = r.meanCellWidth
-        crs = r.spatialReference
+        desc = arcpy.Describe(inraster)
+        lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
+        cellsize = desc.meanCellWidth
+        crs = desc.spatialReference
 
         # Convert python list to ASCII
         arcpy.AddMessage("Writing streams...")
@@ -560,12 +561,29 @@ class GeneralizeDEM(object):
         self.label = "Generalize DEM"
         self.description = ""
         self.canRunInBackground = True
+        self.demdataset = None
+        self.rastertinworkspace = None
+        self.fishbuffer = None
+        self.marine = None
+        self.workspace = None
+        self.cell = None
+        self.minacc1 = None
+        self.minlen1 = None
+        self.minacc2 = None
+        self.minlen2 = None
+        self.is_widen = None
+        self.is_smooth = None
+        self.widendist = None
+        self.filtersize = None
+        self.widentype = None
+        self.i = None
+        self.N = None
 
     def getParameterInfo(self):
 
         demdataset = arcpy.Parameter(
             displayName="Input raster DEM",
-            name="in_raster",
+            name="demdataset",
             datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
@@ -607,7 +625,7 @@ class GeneralizeDEM(object):
 
         minlen1 = arcpy.Parameter(
             displayName="Minimum primary flow length",
-            name="in_raster",
+            name="minlen1",
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
@@ -633,7 +651,7 @@ class GeneralizeDEM(object):
         minlen2.value = 10
 
         is_widen = arcpy.Parameter(
-            displayName="Widen DEM",
+            displayName="Widen Landforms",
             name="is_widen",
             datatype="GPBoolean",
             parameterType="Optional",
@@ -714,43 +732,328 @@ class GeneralizeDEM(object):
     def updateMessages(self, parameters):
         return
 
-    def execute(self, parameters, messages):
+    def call(self, oid):
+        try:
+            i = int(oid)-1
+            arcpy.AddMessage(i)
+            raster = 'dem' + str(i)
 
-        demdataset = parameters[0].valueAsText
-        output = parameters[1].valueAsText
-        outputcellsize = float(parameters[2].valueAsText)
-        minacc1 = int(parameters[3].valueAsText)
-        minlen1 = int(parameters[4].valueAsText)
-        minacc2 = int(parameters[5].valueAsText)
-        minlen2 = int(parameters[6].valueAsText)
-        widentype = parameters[7].valueAsText
-        widendist = float(parameters[8].valueAsText)
-        filtersize = int(parameters[9].valueAsText)
-        marine = parameters[10].valueAsText
-        is_widen = parameters[11].valueAsText
-        is_smooth = parameters[12].valueAsText
+            arcpy.AddMessage('Counting')
+            N = int(arcpy.GetCount_management(self.fishbuffer).getOutput(0))
+
+            # arcpy.AddMessage('Creating cursor')
+            #
+            # fields = arcpy.ListFields(self.fishbuffer)
+            # for field in fields:
+            #     arcpy.AddMessage(field.name)
+
+            arcpy.AddMessage('Selecting cell')
+            cells = arcpy.da.SearchCursor(self.fishbuffer, ['SHAPE@', 'OID@'])
+            cell = cells.next()
+            while cell[1] != oid:
+                cell = cells.next()
+
+            arcpy.AddMessage('---')
+            arcpy.AddMessage('GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N))
+
+            dem0 = arcpy.Raster(self.rastertinworkspace + '/' + raster)
+            dem = dem0
+
+            marine_area = None
+            process_marine = False
+            if self.marine:
+                marine_area = self.workspace + "/land" + str(i)
+                arcpy.Clip_analysis(self.marine, cell[0], marine_area)
+                if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
+                    cell_erased = self.workspace + "/cell_erased" + str(i)
+                    arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
+                    dem = ExtractByMask(dem0, cell_erased)
+                    dem.save(self.rastertinworkspace + '/' + raster + "_e")
+                    dem = arcpy.Raster(self.rastertinworkspace + '/' + raster + "_e")
+                    process_marine = True
+
+            cellsize = dem.meanCellHeight
+
+            arcpy.AddMessage("PREPROCESSING")
+
+            arcpy.AddMessage("Fill...")
+            fill = Fill(dem, "")
+            arcpy.AddMessage("Dir...")
+            dir = FlowDirection(fill, "", "")
+            # dir.save(rastertinworkspace + "/dir")
+            arcpy.AddMessage("Acc...")
+            acc = FlowAccumulation(dir, "", "INTEGER")
+            # acc.save(rastertinworkspace + "/acc")
+
+            # MAIN STREAMS AND WATERSHEDS
+            arcpy.AddMessage("PROCESSING PRIMARY STREAMS AND WATERSHEDS")
+
+            str1_0 = self.workspace + "/str1"
+
+            arcpy.AddMessage("Extracting primary streams...")
+
+            stream_extractor = ExtractStreams()
+            stream_extractor.call(acc, str1_0, self.minacc1, self.minlen1)
+            str1 = SetNull(str1_0, 1, "value = 0")
+
+            arcpy.AddMessage("Vectorizing streams...")
+            streams1 = self.workspace + "/streams1"
+            StreamToFeature(str1, dir, streams1, True)
+
+            arcpy.AddMessage("Deriving endpoints...")
+            endpoints1 = self.workspace + "/endpoints1"
+            arcpy.FeatureVerticesToPoints_management(streams1, endpoints1, "END")
+
+            endbuffers1 = self.workspace + "/endbuffers1"
+            radius = 2 * cellsize
+            arcpy.AddMessage("Buffering endpoints...")
+            arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
+            rendbuffers1 = self.workspace + "/rendbuffers1"
+
+            arcpy.FeatureToRaster_conversion(endbuffers1, "OBJECTID", rendbuffers1, cellsize)
+
+            mask = CreateConstantRaster(-1, "INTEGER", cellsize, dem.extent)
+
+            arcpy.Mosaic_management(mask, rendbuffers1, "MAXIMUM", "FIRST", "", "", "", "0.3", "NONE")
+
+            arcpy.AddMessage("Erasing streams...")
+            str1_e = SetNull(rendbuffers1, str1, "value >= 0")
+
+            arcpy.AddMessage("Vectorizing erased streams...")
+            streams1_e = self.workspace + "/streams1_e"
+            StreamToFeature(str1_e, dir, streams1_e, True)
+
+            arcpy.AddMessage("Deriving erased endpoints...")
+            endpoints1_e = self.workspace + "/endpoints1_e"
+            arcpy.FeatureVerticesToPoints_management(streams1_e, endpoints1_e, "END")
+
+            arcpy.AddMessage("Deriving primary watersheds...")
+            pour1 = SnapPourPoint(endpoints1_e, acc, cellsize * 1.5, "")
+            # pour1.save(rastertinworkspace + "/pour1")
+
+            wsh1 = Watershed(dir, pour1, "")
+
+            arcpy.AddMessage("Vectorizing primary watersheds...")
+            watersheds1 = self.workspace + "/watersheds1"
+            arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
+
+            # SECONDARY STREAMS AND WATERSHEDS
+
+            arcpy.AddMessage("PROCESSING SECONDARY STREAMS AND WATERSHEDS")
+
+            arcpy.AddMessage("Extracting secondary streams...")
+            str2_0 = self.workspace + "/str2"
+            stream_extractor.call(acc, str2_0, self.minacc2, self.minlen2)
+
+            str2 = SetNull(str2_0, 1, "value = 0")
+            str2_e = SetNull(str1_0, str2, "value > 0")
+            acc_e = SetNull(str1_0, acc, "value > 0")
+
+            arcpy.AddMessage("Vectorizing streams...")
+            streams2_e = self.workspace + "/streams2_e"
+            StreamToFeature(str2_e, dir, streams2_e, True)
+
+            arcpy.AddMessage("Deriving endpoints...")
+            endpoints2_e = self.workspace + "/endpoints2_e"
+            arcpy.FeatureVerticesToPoints_management(streams2_e, endpoints2_e, "END")
+
+            arcpy.AddMessage("Buffering primary streams...")
+            streambuffer = self.workspace + "/streams1_b"
+            arcpy.Buffer_analysis(streams1, streambuffer, radius, "FULL", "ROUND", "NONE", "")
+
+            arcpy.AddMessage("Selecting endpoints...")
+            pointslyr = "points"
+            arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
+            arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
+
+            pourpts2 = arcpy.CreateFeatureclass_management("in_memory", "pourpts2", "POINT", pointslyr, "DISABLED",
+                                                           "DISABLED",
+                                                           arcpy.Describe(endpoints2_e).spatialReference)
+            arcpy.CopyFeatures_management(pointslyr, pourpts2)
+
+            arcpy.AddMessage("Deriving secondary pour pts 1...")
+            pour21 = SnapPourPoint(pourpts2, acc_e, cellsize * 1.5, "")
+
+            arcpy.AddMessage("Deriving secondary pour pts 2...")
+            pour22 = SnapPourPoint(pourpts2, acc_e, cellsize * 2, "")
+
+            arcpy.AddMessage("Mosaic secondary pour pts...")
+            arcpy.Mosaic_management(pour21, pour22, "FIRST", "FIRST", "0", "0", "", "0.3", "NONE")
+
+            # pour22.save(rastertinworkspace + "/pour22")
+
+            arcpy.AddMessage("Deriving secondary watersheds...")
+            wsh2 = Watershed(dir, pour22, "")
+            # wsh2.save(rastertinworkspace + "/wsh2")
+
+            arcpy.AddMessage("Vectorizing secondary watersheds...")
+            watersheds2 = self.workspace + "/watersheds2"
+            arcpy.RasterToPolygon_conversion(wsh2, watersheds2, True, "")
+
+            arcpy.AddMessage("Interpolating features into 3D...")
+
+            streams1_3d = self.workspace + "/streams1_3d"
+
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, streams1, streams1_3d)
+
+            watersheds1_3d = self.workspace + "/watersheds1_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, watersheds1, watersheds1_3d)
+
+            watersheds2_3d = self.workspace + "/watersheds2_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, watersheds2, watersheds2_3d)
+
+            marine_3d = self.workspace + "/marine_3d"
+            if process_marine:
+                arcpy.InterpolateShape_3d(self.demdataset, marine_area, marine_3d)
+
+            # GENERALIZED TIN SURFACE
+
+            arcpy.AddMessage("DERIVING GENERALIZED SURFACE")
+
+            arcpy.AddMessage("TIN construction...")
+
+            tin = self.rastertinworkspace + "/tin"
+            features = []
+            s1 = "'" + streams1_3d + "' Shape.Z " + "hardline"
+            w1 = "'" + watersheds1_3d + "' Shape.Z " + "softline"
+            w2 = "'" + watersheds2_3d + "' Shape.Z " + "softline"
+
+            features.append(s1)
+            features.append(w1)
+            features.append(w2)
+            if process_marine:
+                m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
+                features.append(m2)
+
+            featurestring = ';'.join(features)
+
+            arcpy.ddd.CreateTin(tin, "", featurestring, "")
+
+            # GENERALIZED RASTER SURFACE
+            arcpy.AddMessage("TIN to raster conversion...")
+
+            rastertin = self.rastertinworkspace + "/rastertin"
+            try:
+                arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "NATURAL_NEIGHBORS", "CELLSIZE " + str(cellsize), 1)
+            except Exception:
+                arcpy.AddMessage("Failed to rasterize TIN using NATURAL_NEIGHBORS method. Switching to linear")
+                arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "LINEAR", "CELLSIZE " + str(cellsize), 1)
+            # POSTPROCESSING
+
+            arcpy.AddMessage("POSTPROCESSING")
+
+            # Widen valleys and ridges
+            widenraster = rastertin
+            if self.is_widen == "true":
+                arcpy.AddMessage("Raster widening...")
+                widenraster = self.workspace + "/widenraster"
+                dem_widener = WidenLandforms()
+                dem_widener.call(rastertin, streams1, self.widendist, self.filtersize, widenraster, self.widentype)
+
+            # Smooth DEM
+            result = arcpy.Raster(widenraster)
+            if self.is_smooth == "true":
+                arcpy.AddMessage("Raster filtering...")
+                neighborhood = NbrRectangle(self.filtersize, self.filtersize, "CELL")
+                result = FocalStatistics(widenraster, neighborhood, "MEAN", "DATA")
+
+            if process_marine:
+                arcpy.AddMessage("Masking marine regions...")
+                result_erased = ExtractByMask(result, cell_erased)
+                arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
+                arcpy.AddMessage("Saving result...")
+                res = arcpy.Raster(rastertin)
+                res.save(self.rastertinworkspace + '/gen/dem' + str(i))
+            else:
+                arcpy.AddMessage("Saving result...")
+                result.save(self.rastertinworkspace + '/gen/dem' + str(i))
+
+            arcpy.Delete_management(pointslyr)
+
+            self.i += 1
+
+            if self.i == self.N:
+                arcpy.AddMessage("---")
+                arcpy.AddMessage("CLEANING TEMPORARY DATA")
+
+                # arcpy.Delete_management(str1_0)
+                # arcpy.Delete_management(str2_0)
+                # arcpy.Delete_management(streams1)
+                # arcpy.Delete_management(endpoints1)
+                # arcpy.Delete_management(endbuffers1)
+                # arcpy.Delete_management(rendbuffers1)
+                # arcpy.Delete_management(streams1_e)
+                # arcpy.Delete_management(endpoints1_e)
+                # arcpy.Delete_management(watersheds1)
+                # arcpy.Delete_management(streams2_e)
+                # arcpy.Delete_management(endpoints2_e)
+                # arcpy.Delete_management(streambuffer)
+                # arcpy.Delete_management(pourpts2)
+                # arcpy.Delete_management(watersheds2)
+                # arcpy.Delete_management(streams1_3d)
+                # arcpy.Delete_management(watersheds1_3d)
+                # arcpy.Delete_management(watersheds2_3d)
+                # arcpy.Delete_management(tin)
+                # arcpy.Delete_management(rastertin)
+                # arcpy.Delete_management(widenraster)
+                #
+                # arcpy.Delete_management(fill)
+                # arcpy.Delete_management(dir)
+                # arcpy.Delete_management(acc)
+                # arcpy.Delete_management(str1)
+                # arcpy.Delete_management(str2)
+                # arcpy.Delete_management(mask)
+                # arcpy.Delete_management(str1_e)
+                # arcpy.Delete_management(str2_e)
+                # arcpy.Delete_management(pour1)
+                # arcpy.Delete_management(pour21)
+                # arcpy.Delete_management(pour22)
+                # arcpy.Delete_management(wsh1)
+                # arcpy.Delete_management(wsh2)
+                # arcpy.Delete_management(acc_e)
+
+        except Exception:
+            arcpy.AddMessage("Failed to generalize " + raster)
+
+    def execute(self, parameters, messages):
+        self.demdataset = parameters[0].valueAsText
+        self.marine = parameters[1].valueAsText
+        output = parameters[2].valueAsText
+        outputcellsize = float(parameters[3].valueAsText)
+        self.minacc1 = int(parameters[4].valueAsText)
+        self.minlen1 = int(parameters[5].valueAsText)
+        self.minacc2 = int(parameters[6].valueAsText)
+        self.minlen2 = int(parameters[7].valueAsText)
+        self.is_widen = parameters[8].valueAsText
+        self.widentype = parameters[9].valueAsText
+        self.widendist = float(parameters[10].valueAsText)
+        self.filtersize = int(parameters[11].valueAsText)
+        self.is_smooth = parameters[12].valueAsText
         is_parallel = parameters[13].valueAsText
         tilesize = int(parameters[14].valueAsText)
 
-        workspace = os.path.dirname(output)
+        self.workspace = os.path.dirname(output)
 
         # raster workspace MUST be a folder, no
-        rastertinworkspace = workspace
-        n = len(rastertinworkspace)
+        self.rastertinworkspace = self.workspace
+        n = len(self.rastertinworkspace)
         if n > 4:
-            end = rastertinworkspace[n - 4: n]  # extract last 4 letters
+            end = self.rastertinworkspace[n - 4: n]  # extract last 4 letters
             if end == ".gdb":  # geodatabase
-                rastertinworkspace = os.path.dirname(rastertinworkspace)
-        arcpy.CreateFolder_management(rastertinworkspace, 'scratch')
-        rastertinworkspace += '/scratch'
+                self.rastertinworkspace = os.path.dirname(self.rastertinworkspace)
 
-        arcpy.CreateFolder_management(rastertinworkspace, 'gen')
-        arcpy.CreateFolder_management(rastertinworkspace, 'gencrop')
+        arcpy.AddMessage(self.rastertinworkspace)
 
-        arcpy.env.scratchWorkspace = rastertinworkspace
+        arcpy.CreateFolder_management(self.rastertinworkspace, 'scratch')
+        self.rastertinworkspace += '/scratch'
+
+        arcpy.CreateFolder_management(self.rastertinworkspace, 'gen')
+        arcpy.CreateFolder_management(self.rastertinworkspace, 'gencrop')
+
+        arcpy.env.scratchWorkspace = self.rastertinworkspace
         arcpy.env.workspace = arcpy.env.scratchWorkspace
 
-        demsource = arcpy.Raster(demdataset)
+        demsource = arcpy.Raster(self.demdataset)
 
         nrows = math.ceil(demsource.height / tilesize)
         ncols = math.ceil(demsource.width / tilesize)
@@ -764,7 +1067,7 @@ class GeneralizeDEM(object):
         arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
         arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
 
-        fishnet = workspace + "/fishnet"
+        fishnet = self.workspace + "/fishnet"
         arcpy.CreateFishnet_management(fishnet,
                                        str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin),
                                        str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin + 1),
@@ -773,301 +1076,47 @@ class GeneralizeDEM(object):
                                        '', '',
                                        demsource.extent, 'POLYGON')
 
-        fishbuffer = workspace + "/fishbuffer"
-        arcpy.Buffer_analysis(fishnet, fishbuffer, bufferwidth)
+        self.fishbuffer = self.workspace + "/fishbuffer"
+        arcpy.Buffer_analysis(fishnet, self.fishbuffer, bufferwidth)
 
-        fishmaskbuffer = workspace + "/fishmaskbuffer"
+        fishmaskbuffer = self.workspace + "/fishmaskbuffer"
         arcpy.Buffer_analysis(fishnet, fishmaskbuffer, max(demsource.meanCellHeight, demsource.meanCellWidth))
 
-        arcpy.SplitRaster_management(demdataset,
-                                     rastertinworkspace,
+        arcpy.SplitRaster_management(self.demdataset,
+                                     self.rastertinworkspace,
                                      'dem',
                                      'POLYGON_FEATURES',
                                      'GRID',
                                      '', '', '', '', '', '', '',
-                                     fishbuffer)
+                                     self.fishbuffer)
 
-        rasters = arcpy.ListRasters("*", "GRID")
+        # rasters = arcpy.ListRasters("*", "GRID")
 
-        N = len(rasters)
-        i = 0
+        rows = arcpy.da.SearchCursor(self.fishbuffer, 'OID@')
+        oids = [row[0] for row in rows]
 
-        rows = arcpy.da.SearchCursor(fishbuffer, ['SHAPE@', 'OID@'])
+        # MAIN PROCESSING
+        if is_parallel == 'true':
 
-        for cell in rows:
-            try:
-                raster = 'dem' + str(i)
+            arcpy.AddMessage('Trying to make multiprocessing')
 
-                arcpy.AddMessage('---')
-                arcpy.AddMessage('GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N))
-
-                dem0 = arcpy.Raster(rastertinworkspace + '/' + raster)
-                dem = dem0
-
-                marine_area = None
-                process_marine = False
-                if marine:
-                    marine_area = workspace + "/land" + str(i)
-                    arcpy.Clip_analysis(marine, cell[0], marine_area)
-                    if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
-                        cell_erased = workspace + "/cell_erased" + str(i)
-                        arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
-                        dem = ExtractByMask(dem0, cell_erased)
-                        dem.save(rastertinworkspace + '/' + raster + "_e")
-                        dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
-                        process_marine = True
-
-                cellsize = dem.meanCellHeight
-
-                arcpy.AddMessage("PREPROCESSING")
-
-                arcpy.AddMessage("Fill...")
-                fill = Fill(dem, "")
-                arcpy.AddMessage("Dir...")
-                dir = FlowDirection(fill, "", "")
-                # dir.save(rastertinworkspace + "/dir")
-                arcpy.AddMessage("Acc...")
-                acc = FlowAccumulation(dir, "", "INTEGER")
-                # acc.save(rastertinworkspace + "/acc")
-
-                # MAIN STREAMS AND WATERSHEDS
-                arcpy.AddMessage("PROCESSING PRIMARY STREAMS AND WATERSHEDS")
-
-                str1_0 = workspace + "/str1"
-
-                arcpy.AddMessage("Extracting primary streams...")
-
-                stream_extractor = ExtractStreams()
-                stream_extractor.call(acc, str1_0, minacc1, minlen1)
-                str1 = SetNull(str1_0, 1, "value = 0")
-
-                arcpy.AddMessage("Vectorizing streams...")
-                streams1 = workspace + "/streams1"
-                StreamToFeature(str1, dir, streams1, True)
-
-                arcpy.AddMessage("Deriving endpoints...")
-                endpoints1 = workspace + "/endpoints1"
-                arcpy.FeatureVerticesToPoints_management(streams1, endpoints1, "END")
-
-                endbuffers1 = workspace + "/endbuffers1"
-                radius = 2 * cellsize
-                arcpy.AddMessage("Buffering endpoints...")
-                arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
-                rendbuffers1 = workspace + "/rendbuffers1"
-
-                arcpy.FeatureToRaster_conversion(endbuffers1, "OBJECTID", rendbuffers1, cellsize)
-
-                mask = CreateConstantRaster(-1, "INTEGER", cellsize, dem.extent)
-
-                arcpy.Mosaic_management(mask, rendbuffers1, "MAXIMUM", "FIRST", "", "", "", "0.3", "NONE")
-
-                arcpy.AddMessage("Erasing streams...")
-                str1_e = SetNull(rendbuffers1, str1, "value >= 0")
-
-                arcpy.AddMessage("Vectorizing erased streams...")
-                streams1_e = workspace + "/streams1_e"
-                StreamToFeature(str1_e, dir, streams1_e, True)
-
-                arcpy.AddMessage("Deriving erased endpoints...")
-                endpoints1_e = workspace + "/endpoints1_e"
-                arcpy.FeatureVerticesToPoints_management(streams1_e, endpoints1_e, "END")
-
-                arcpy.AddMessage("Deriving primary watersheds...")
-                pour1 = SnapPourPoint(endpoints1_e, acc, cellsize * 1.5, "")
-                # pour1.save(rastertinworkspace + "/pour1")
-
-                wsh1 = Watershed(dir, pour1, "")
-
-                arcpy.AddMessage("Vectorizing primary watersheds...")
-                watersheds1 = workspace + "/watersheds1"
-                arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
-
-                # SECONDARY STREAMS AND WATERSHEDS
-
-                arcpy.AddMessage("PROCESSING SECONDARY STREAMS AND WATERSHEDS")
-
-                arcpy.AddMessage("Extracting secondary streams...")
-                str2_0 = workspace + "/str2"
-                stream_extractor.call(acc, str2_0, minacc2, minlen2)
-
-                str2 = SetNull(str2_0, 1, "value = 0")
-                str2_e = SetNull(str1_0, str2, "value > 0")
-                acc_e = SetNull(str1_0, acc, "value > 0")
-
-                arcpy.AddMessage("Vectorizing streams...")
-                streams2_e = workspace + "/streams2_e"
-                StreamToFeature(str2_e, dir, streams2_e, True)
-
-                arcpy.AddMessage("Deriving endpoints...")
-                endpoints2_e = workspace + "/endpoints2_e"
-                arcpy.FeatureVerticesToPoints_management(streams2_e, endpoints2_e, "END")
-
-                arcpy.AddMessage("Buffering primary streams...")
-                streambuffer = workspace + "/streams1_b"
-                arcpy.Buffer_analysis(streams1, streambuffer, radius, "FULL", "ROUND", "NONE", "")
-
-                arcpy.AddMessage("Selecting endpoints...")
-                pointslyr = "points"
-                arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
-                arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
-
-                pourpts2 = arcpy.CreateFeatureclass_management("in_memory", "pourpts2", "POINT", pointslyr, "DISABLED",
-                                                               "DISABLED",
-                                                               arcpy.Describe(endpoints2_e).spatialReference)
-                arcpy.CopyFeatures_management(pointslyr, pourpts2)
-
-                arcpy.AddMessage("Deriving secondary pour pts 1...")
-                pour21 = SnapPourPoint(pourpts2, acc_e, cellsize * 1.5, "")
-
-                arcpy.AddMessage("Deriving secondary pour pts 2...")
-                pour22 = SnapPourPoint(pourpts2, acc_e, cellsize * 2, "")
-
-                arcpy.AddMessage("Mosaic secondary pour pts...")
-                arcpy.Mosaic_management(pour21, pour22, "FIRST", "FIRST", "0", "0", "", "0.3", "NONE")
-
-                # pour22.save(rastertinworkspace + "/pour22")
-
-                arcpy.AddMessage("Deriving secondary watersheds...")
-                wsh2 = Watershed(dir, pour22, "")
-                # wsh2.save(rastertinworkspace + "/wsh2")
-
-                arcpy.AddMessage("Vectorizing secondary watersheds...")
-                watersheds2 = workspace + "/watersheds2"
-                arcpy.RasterToPolygon_conversion(wsh2, watersheds2, True, "")
-
-                arcpy.AddMessage("Interpolating features into 3D...")
-
-                streams1_3d = workspace + "/streams1_3d"
-
-                arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, streams1, streams1_3d)
-
-                watersheds1_3d = workspace + "/watersheds1_3d"
-                arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, watersheds1, watersheds1_3d)
-
-                watersheds2_3d = workspace + "/watersheds2_3d"
-                arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, watersheds2, watersheds2_3d)
-
-                marine_3d = workspace + "/marine_3d"
-                if process_marine:
-                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d)
-
-                # GENERALIZED TIN SURFACE
-
-                arcpy.AddMessage("DERIVING GENERALIZED SURFACE")
-
-                arcpy.AddMessage("TIN construction...")
-
-                tin = rastertinworkspace + "/tin"
-                features = []
-                s1 = "'" + streams1_3d + "' Shape.Z " + "hardline"
-                w1 = "'" + watersheds1_3d + "' Shape.Z " + "softline"
-                w2 = "'" + watersheds2_3d + "' Shape.Z " + "softline"
-
-                features.append(s1)
-                features.append(w1)
-                features.append(w2)
-                if process_marine:
-                    m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
-                    features.append(m2)
-
-                featurestring = ';'.join(features)
-
-                arcpy.ddd.CreateTin(tin, "", featurestring, "")
-
-                # GENERALIZED RASTER SURFACE
-                arcpy.AddMessage("TIN to raster conversion...")
-
-                rastertin = rastertinworkspace + "/rastertin"
-                arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "NATURAL_NEIGHBORS", "CELLSIZE " + str(cellsize), 1)
-
-                # POSTPROCESSING
-
-                arcpy.AddMessage("POSTPROCESSING")
-
-                # Widen valleys and ridges
-                widenraster = rastertin
-                if is_widen == "true":
-                    arcpy.AddMessage("Raster widening...")
-                    widenraster = workspace + "/widenraster"
-                    dem_widener = WidenLandforms()
-                    dem_widener.call(rastertin, streams1, widendist, filtersize, widenraster, widentype)
-
-                # Smooth DEM
-                result = arcpy.Raster(widenraster)
-                if is_smooth == "true":
-                    arcpy.AddMessage("Raster filtering...")
-                    neighborhood = NbrRectangle(filtersize, filtersize, "CELL")
-                    result = FocalStatistics(widenraster, neighborhood, "MEAN", "DATA")
-
-                if process_marine:
-                    arcpy.AddMessage("Masking marine regions...")
-                    result_erased = ExtractByMask(result, cell_erased)
-                    arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
-                    arcpy.AddMessage("Saving result...")
-                    res = arcpy.Raster(rastertin)
-                    res.save(rastertinworkspace + '/gen/dem' + str(i))
-                else:
-                    arcpy.AddMessage("Saving result...")
-                    result.save(rastertinworkspace + '/gen/dem' + str(i))
-
-                arcpy.Delete_management(pointslyr)
-
-                i += 1
-
-                if i == N:
-                    arcpy.AddMessage("---")
-                    arcpy.AddMessage("CLEANING TEMPORARY DATA")
-
-                    # arcpy.Delete_management(str1_0)
-                    # arcpy.Delete_management(str2_0)
-                    # arcpy.Delete_management(streams1)
-                    # arcpy.Delete_management(endpoints1)
-                    # arcpy.Delete_management(endbuffers1)
-                    # arcpy.Delete_management(rendbuffers1)
-                    # arcpy.Delete_management(streams1_e)
-                    # arcpy.Delete_management(endpoints1_e)
-                    # arcpy.Delete_management(watersheds1)
-                    # arcpy.Delete_management(streams2_e)
-                    # arcpy.Delete_management(endpoints2_e)
-                    # arcpy.Delete_management(streambuffer)
-                    # arcpy.Delete_management(pourpts2)
-                    # arcpy.Delete_management(watersheds2)
-                    # arcpy.Delete_management(streams1_3d)
-                    # arcpy.Delete_management(watersheds1_3d)
-                    # arcpy.Delete_management(watersheds2_3d)
-                    # arcpy.Delete_management(tin)
-                    # arcpy.Delete_management(rastertin)
-                    # arcpy.Delete_management(widenraster)
-                    #
-                    # arcpy.Delete_management(fill)
-                    # arcpy.Delete_management(dir)
-                    # arcpy.Delete_management(acc)
-                    # arcpy.Delete_management(str1)
-                    # arcpy.Delete_management(str2)
-                    # arcpy.Delete_management(mask)
-                    # arcpy.Delete_management(str1_e)
-                    # arcpy.Delete_management(str2_e)
-                    # arcpy.Delete_management(pour1)
-                    # arcpy.Delete_management(pour21)
-                    # arcpy.Delete_management(pour22)
-                    # arcpy.Delete_management(wsh1)
-                    # arcpy.Delete_management(wsh2)
-                    # arcpy.Delete_management(acc_e)
-
-            except Exception:
-                arcpy.AddMessage("Failed to generalize " + raster)
+            # os.system("Test.py 12")
+            execute(*oids)
+        else:
+            for oid in oids:
+                self.call(oid)
 
         arcpy.AddMessage("CLIPPING ANS MASKING GENERALIZED RASTERS")
 
         rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
         i = 0
         for row in rows:
-            dem = arcpy.Raster(rastertinworkspace + '/gen/dem' + str(i))
+            dem = arcpy.Raster(self.rastertinworkspace + '/gen/dem' + str(i))
             dem_clipped = ExtractByMask(dem, row[0])
-            dem_clipped.save(rastertinworkspace + '/gencrop/dem' + str(i))
+            dem_clipped.save(self.rastertinworkspace + '/gencrop/dem' + str(i))
             i += 1
 
-        arcpy.env.workspace = rastertinworkspace + '/gencrop/'
+        arcpy.env.workspace = self.rastertinworkspace + '/gencrop/'
 
         rasters = arcpy.ListRasters("*", "GRID")
 
