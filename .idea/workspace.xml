@@ -1,17 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="27551e22-afbb-4a97-9246-bda30e28d16a" name="Default" comment="Corrected variable and function naming for general conventions">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/DEM Generalization.tbx" afterPath="$PROJECT_DIR$/DEM Generalization.tbx" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/ExtractStreams.py" afterPath="$PROJECT_DIR$/ExtractStreams.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/FilterDEM.py" afterPath="$PROJECT_DIR$/FilterDEM.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GeneralizeDEM.py" afterPath="$PROJECT_DIR$/GeneralizeDEM.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GeneralizeDEM.pyt" afterPath="$PROJECT_DIR$/GeneralizeDEM.pyt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GeneralizeDEM.pyt.xml" afterPath="$PROJECT_DIR$/GeneralizeDEM.pyt.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Test.py" afterPath="$PROJECT_DIR$/Test.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/WidenLandforms.py" afterPath="$PROJECT_DIR$/WidenLandforms.py" />
-    </list>
+    <list default="true" id="27551e22-afbb-4a97-9246-bda30e28d16a" name="Default" comment="Corrected variable and function naming for general conventions" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -28,19 +18,7 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="GeneralizeDEM.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/GeneralizeDEM.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="330">
-              <caret line="112" column="38" lean-forward="false" selection-start-line="112" selection-start-column="37" selection-end-line="112" selection-end-column="38" />
-              <folding>
-                <element signature="e#268#280#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="ExtractStreams.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="ExtractStreams.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/ExtractStreams.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="2055">
@@ -803,21 +781,21 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/GeneralizeDEM.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="390">
+          <caret line="116" column="50" lean-forward="true" selection-start-line="116" selection-start-column="50" selection-end-line="116" selection-end-column="50" />
+          <folding>
+            <element signature="e#268#280#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/ExtractStreams.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2055">
           <caret line="137" column="44" lean-forward="false" selection-start-line="137" selection-start-column="44" selection-end-line="137" selection-end-column="44" />
           <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/GeneralizeDEM.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="330">
-          <caret line="112" column="38" lean-forward="false" selection-start-line="112" selection-start-column="37" selection-end-line="112" selection-end-column="38" />
-          <folding>
-            <element signature="e#268#280#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
