@@ -1,4 +1,12 @@
 import GeneralizeDEM
+import multiprocessing
+import arcpy
+import time
+
+def worker(oid):
+    arcpy.AddMessage('Yeah')
+    time.sleep(5)
+    return oid
 
 if __name__ == '__main__':
 
@@ -26,6 +34,41 @@ if __name__ == '__main__':
     except Exception:
         print("Quit with error...")
         input("Press Enter to continue...")
+
+    # arcpy.AddMessage('Trying to make multiprocessing')
+    # arcpy.AddMessage('Creating Pool')
+    # pool = multiprocessing.Pool(processes=3)
+    # jobs = []
+    # oids = [1, 2, 3, 4, 5]
+    # arcpy.AddMessage(multiprocessing.cpu_count())
+
+    # PROCESS
+    # try:
+    #     for oid in oids:
+    #         p = multiprocessing.Process(target = worker, args = (oid,))
+    #         jobs.append(p)
+    #         p.start()
+    #     for job in jobs:
+    #         job.join()
+    # except:
+    #     input("Press Enter to continue...")
+
+    # POOL ASYNC
+    # try:
+    #     for oid in oids:
+    #         pool.apply_async(worker, (oid,))
+    #     pool.close()
+    #     pool.join()
+    # except:
+    #     input("Press Enter to continue...")
+
+    # POOL MAP
+    # try:
+    #     pool.map(worker, oids)
+    #     pool.close()
+    #     pool.join()
+    # except:
+    #     input("Press Enter to continue...")
 
 
     input("Press Enter to continue...")

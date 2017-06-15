@@ -7,6 +7,8 @@
 import arcpy
 import math
 import pp
+import multiprocessing
+import time
 from arcpy.sa import *
 import os.path, ExtractStreams, WidenLandforms
 __author__ = 'Timofey Samsonov'
@@ -25,17 +27,31 @@ def call(oid,
          widendist,
          filtersize,
          is_smooth,
-         workspace,
-         rastertinworkspace):
+         scratchworkspace):
+
+    arcpy.CheckOutExtension("Spatial")
+    arcpy.CheckOutExtension("3D")
+
+    arcpy.CreateFolder_management(scratchworkspace + '/processing', 'tile' + str(oid))
+    rastertinworkspace = scratchworkspace + '/processing/tile' + str(oid)
+
+    gdb_name = 'tile' + str(oid) + '.gdb'
+
+    arcpy.CreateFileGDB_management(rastertinworkspace, gdb_name)
+
+    workspace = rastertinworkspace + '/' + gdb_name
+
+    arcpy.env.scratchWorkspace = rastertinworkspace
+    arcpy.env.workspace = workspace
 
     i = int(oid)-1
     arcpy.AddMessage(i)
     raster = 'dem0_' + str(i)
 
-    arcpy.AddMessage('Counting')
+    # arcpy.AddMessage('Counting')
     N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
 
-    arcpy.AddMessage('Selecting cell')
+    # arcpy.AddMessage('Selecting cell')
     cells = arcpy.da.SearchCursor(fishbuffer, ['SHAPE@', 'OID@'])
     cell = cells.next()
     while cell[1] != oid:
@@ -44,7 +60,7 @@ def call(oid,
     arcpy.AddMessage('---')
     arcpy.AddMessage('GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N))
 
-    dem0 = arcpy.Raster(rastertinworkspace + '/' + raster)
+    dem0 = arcpy.Raster(scratchworkspace + '/source/' + raster)
     dem = dem0
 
     marine_area = None
@@ -64,6 +80,7 @@ def call(oid,
 
     arcpy.AddMessage("PREPROCESSING")
 
+    arcpy.AddMessage(dem)
     arcpy.AddMessage("Fill...")
     fill = Fill(dem, "")
     arcpy.AddMessage("Dir...")
@@ -159,9 +176,11 @@ def call(oid,
     arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
     arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
 
-    pourpts2 = arcpy.CreateFeatureclass_management("in_memory", "pourpts2", "POINT", pointslyr, "DISABLED",
-                                                   "DISABLED",
-                                                   arcpy.Describe(endpoints2_e).spatialReference)
+    # pourpts2 = arcpy.CreateFeatureclass_management(workspace, "pourpts2", "POINT", pointslyr, "DISABLED",
+    #                                                "DISABLED",
+    #                                                arcpy.Describe(endpoints2_e).spatialReference)
+
+    pourpts2 = workspace + "/pourpts2"
     arcpy.CopyFeatures_management(pointslyr, pourpts2)
 
     arcpy.AddMessage("Deriving secondary pour pts 1...")
@@ -194,7 +213,7 @@ def call(oid,
 
     marine_3d = workspace + "/marine_3d"
     if process_marine:
-        arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d)
+        arcpy.InterpolateShape_3d(dem0, marine_area, marine_3d)
 
     # GENERALIZED TIN SURFACE
 
@@ -252,15 +271,24 @@ def call(oid,
         arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
         arcpy.AddMessage("Saving result...")
         res = arcpy.Raster(rastertin)
-        res.save(rastertinworkspace + '/gen/dem' + str(i))
+        res.save(scratchworkspace + '/gen/dem' + str(i))
     else:
         arcpy.AddMessage("Saving result...")
-        result.save(rastertinworkspace + '/gen/dem' + str(i))
+        result.save(scratchworkspace + '/gen/dem' + str(i))
 
     arcpy.Delete_management(pointslyr)
 
 def worker(oid):
+    arcpy.AddMessage('Yeah')
+    time.sleep(5)
     return oid
+#
+# def worker2(oid, number):
+#     arcpy.AddMessage(oid)
+#     arcpy.AddMessage(number)
+#     arcpy.AddMessage('Yeah2')
+#     return number
+
 
 def execute(demdataset,
             marine,
@@ -286,23 +314,27 @@ def execute(demdataset,
     workspace = os.path.dirname(output)
 
     # raster workspace MUST be a folder, no
-    rastertinworkspace = workspace
-    n = len(rastertinworkspace)
+    scratchworkspace = workspace
+    n = len(scratchworkspace)
     if n > 4:
-        end = rastertinworkspace[n - 4: n]  # extract last 4 letters
+        end = scratchworkspace[n - 4: n]  # extract last 4 letters
         if end == ".gdb":  # geodatabase
-            rastertinworkspace = os.path.dirname(rastertinworkspace)
+            scratchworkspace = os.path.dirname(scratchworkspace)
 
-    arcpy.CreateFolder_management(rastertinworkspace, 'scratch')
-    rastertinworkspace += '/scratch'
+    arcpy.CreateFolder_management(scratchworkspace, 'scratch')
+    scratchworkspace += '/scratch'
 
-    arcpy.AddMessage(rastertinworkspace)
+    arcpy.CreateFolder_management(scratchworkspace, 'gen') # generalized tiles
+    arcpy.CreateFolder_management(scratchworkspace, 'gencrop') # generalized and cropped tiles
+    arcpy.CreateFolder_management(scratchworkspace, 'processing') # main processing workspace
+    arcpy.CreateFolder_management(scratchworkspace, 'source') # source tiles
 
-    arcpy.CreateFolder_management(rastertinworkspace, 'gen')
-    arcpy.CreateFolder_management(rastertinworkspace, 'gencrop')
+    arcpy.CreateFileGDB_management(scratchworkspace, 'Scratch.gdb')
 
-    arcpy.env.scratchWorkspace = rastertinworkspace
-    arcpy.env.workspace = arcpy.env.scratchWorkspace
+    workspace = scratchworkspace + "/Scratch.gdb"
+
+    # arcpy.env.scratchWorkspace = scratchworkspace
+    # arcpy.env.workspace = arcpy.env.scratchWorkspace
 
     demsource = arcpy.Raster(demdataset)
 
@@ -312,11 +344,11 @@ def execute(demdataset,
 
     cellsize = 0.5 * (demsource.meanCellHeight + demsource.meanCellWidth)
 
-    arcpy.AddMessage(demsource.height)
-    arcpy.AddMessage(demsource.width)
-    arcpy.AddMessage(cellsize)
-    arcpy.AddMessage(nrows)
-    arcpy.AddMessage(ncols)
+    # arcpy.AddMessage(demsource.height)
+    # arcpy.AddMessage(demsource.width)
+    # arcpy.AddMessage(cellsize)
+    # arcpy.AddMessage(nrows)
+    # arcpy.AddMessage(ncols)
 
     bufferpixelwidth = math.ceil(max(demsource.width, demsource.height) / (max(nrows, ncols) * 10))
     bufferwidth = bufferpixelwidth * cellsize
@@ -324,9 +356,8 @@ def execute(demdataset,
     arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
     arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
 
-    arcpy.AddMessage('Making fishnet ')
+    arcpy.AddMessage('Creating fishnet...')
     fishnet = workspace + "/fishnet"
-    arcpy.AddMessage('fishnet')
     arcpy.CreateFishnet_management(fishnet,
                                    str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin),
                                    str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin + 1),
@@ -334,51 +365,71 @@ def execute(demdataset,
                                    nrows, ncols,
                                    '', '',
                                    demsource.extent, 'POLYGON')
-    arcpy.AddMessage('Making buffer ')
+
+    arcpy.AddMessage('Creating split buffer...')
     fishbuffer = workspace + "/fishbuffer"
     arcpy.Buffer_analysis(fishnet, fishbuffer, bufferwidth)
 
-    arcpy.AddMessage('Making mask buffer ')
+    arcpy.AddMessage('Creating mask buffer...')
     fishmaskbuffer = workspace + "/fishmaskbuffer"
     arcpy.Buffer_analysis(fishnet, fishmaskbuffer, max(demsource.meanCellHeight, demsource.meanCellWidth))
 
-    arcpy.AddMessage('Splitting raster ')
+    arcpy.AddMessage('Splitting raster...')
     arcpy.SplitRaster_management(demdataset,
-                                 rastertinworkspace,
+                                 scratchworkspace + "/source",
                                  'dem',
                                  'POLYGON_FEATURES',
                                  'GRID',
                                  '', '', '', '', '', '', '',
                                  fishbuffer)
 
-    arcpy.AddMessage('Creating cursor')
     rows = arcpy.da.SearchCursor(fishbuffer, 'OID@')
     oids = [row[0] for row in rows]
 
     # MAIN PROCESSING
     if is_parallel == 'true':
-        arcpy.AddMessage('Trying to make multiprocessing')
-
-        prc = int(os.environ["NUMBER_OF_PROCESSORS"]) - 1
-
-        arcpy.AddMessage('Detected ' + str(prc) + ' processors')
-
-        # using Parellel python
-        ppservers = ()
-
-        # sets workers to prc
-        job_server = pp.Server(prc, ppservers=ppservers)
-
+        nproc = multiprocessing.cpu_count()
+        arcpy.AddMessage('Trying to make multiprocessing using ' + str(nproc) + ' processor cores')
+        pool = multiprocessing.Pool(nproc)
         jobs = []
-
         for oid in oids:
-            jobs.append(job_server.submit(func=worker, args=(oid,)))
+            pool.apply_async(call, (oid,
+                                    demdataset,
+                                    marine,
+                                    fishbuffer,
+                                    minacc1,
+                                    minlen1,
+                                    minacc2,
+                                    minlen2,
+                                    is_widen,
+                                    widentype,
+                                    widendist,
+                                    filtersize,
+                                    is_smooth,
+                                    scratchworkspace,))
+        pool.close()
+        pool.join()
 
-        # Retrieve results of all submited jobs
-        for job in jobs:
-            print job()
-            arcpy.AddMessage(job())
-
+        # for oid in oids:
+        #     p = multiprocessing.Process(target = call,
+        #                                 args = (oid,
+        #                                         demdataset,
+        #                                         marine,
+        #                                         fishbuffer,
+        #                                         minacc1,
+        #                                         minlen1,
+        #                                         minacc2,
+        #                                         minlen2,
+        #                                         is_widen,
+        #                                         widentype,
+        #                                         widendist,
+        #                                         filtersize,
+        #                                         is_smooth,
+        #                                         scratchworkspace,))
+        #     jobs.append(p)
+        #     p.start()
+        # for job in jobs:
+        #     job.join()
     else:
         for oid in oids:
             try:
@@ -395,22 +446,20 @@ def execute(demdataset,
                      widendist,
                      filtersize,
                      is_smooth,
-                     workspace,
-                     rastertinworkspace)
+                     scratchworkspace)
             except Exception:
                 arcpy.AddMessage("Failed to generalize dem" + str(oid - 1))
-
     arcpy.AddMessage("CLIPPING AND MASKING GENERALIZED RASTERS")
 
     rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
     i = 0
     for row in rows:
-        dem = arcpy.Raster(rastertinworkspace + '/gen/dem' + str(i))
+        dem = arcpy.Raster(scratchworkspace + '/gen/dem' + str(i))
         dem_clipped = ExtractByMask(dem, row[0])
-        dem_clipped.save(rastertinworkspace + '/gencrop/dem' + str(i))
+        dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
         i += 1
 
-    arcpy.env.workspace = rastertinworkspace + '/gencrop/'
+    arcpy.env.workspace = scratchworkspace + '/gencrop/'
 
     rasters = arcpy.ListRasters("*", "GRID")
 
@@ -425,7 +474,6 @@ def execute(demdataset,
                                        "1",
                                        "BLEND",
                                        "FIRST")
-
     return
 
 if __name__ == '__main__':
@@ -450,10 +498,3 @@ if __name__ == '__main__':
             minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
             is_smooth, is_parallel, tilesize)
-
-
-
-
-
-
-

@@ -12,7 +12,14 @@ __author__ = 'Timofey Samsonov'
 
 
 def execute(demdataset, streams, distance, windowsize, output, ftype):
-    arcpy.env.workspace = "in_memory"
+    # arcpy.env.workspace = "in_memory"
+
+    arcpy.CheckOutExtension("Spatial")
+    arcpy.CheckOutExtension("3D")
+
+    # arcpy.env.workspace = os.path.dirname(output)
+    # arcpy.env.scratchworkspace = os.path.dirname(output)
+
     arcpy.env.snapRaster = demdataset
     dem = arcpy.sa.Raster(demdataset)
     cellsize = dem.meanCellHeight
@@ -23,8 +30,11 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
 
     # Derive valleys weights
     arcpy.AddMessage("Calculating valley weights...")
+    arcpy.AddMessage("Divide")
     divdist = Divide(distances, distance)
+    arcpy.AddMessage("Minus")
     divdistminus = Minus(1, divdist)
+    arcpy.AddMessage("Con")
     w_valleys = Con(divdistminus, 0, divdistminus, "value < 0")
 
     # Derive ridges weights
