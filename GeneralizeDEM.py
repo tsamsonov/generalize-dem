@@ -12,20 +12,21 @@ import os.path, ExtractStreams, WidenLandforms
 __author__ = 'Timofey Samsonov'
 
 
-def execute(oid,
-            demdataset,
-            marine,
-            minacc1,
-            minlen1,
-            minacc2,
-            minlen2,
-            is_widen,
-            widentype,
-            widendist,
-            filtersize,
-            is_smooth,
-            workspace,
-            rastertinworkspace):
+def call(oid,
+         demdataset,
+         marine,
+         fishbuffer,
+         minacc1,
+         minlen1,
+         minacc2,
+         minlen2,
+         is_widen,
+         widentype,
+         widendist,
+         filtersize,
+         is_smooth,
+         workspace,
+         rastertinworkspace):
 
     i = int(oid)-1
     arcpy.AddMessage(i)
@@ -257,31 +258,23 @@ def execute(oid,
         result.save(rastertinworkspace + '/gen/dem' + str(i))
 
     arcpy.Delete_management(pointslyr)
-    
 
-if __name__ == '__main__':
 
-    arcpy.CheckOutExtension("3D")
-    arcpy.CheckOutExtension("Spatial")
-
-    arcpy.env.overwriteOutput = True
-
-    demdataset = arcpy.GetParameterAsText(0)
-    marine = arcpy.GetParameterAsText(1)
-    output = arcpy.GetParameterAsText(2)
-    outputcellsize = float(arcpy.GetParameterAsText(3))
-    minacc1 = int(arcpy.GetParameterAsText(4))
-    minlen1 = int(arcpy.GetParameterAsText(5))
-    minacc2 = int(arcpy.GetParameterAsText(6))
-    minlen2 = int(arcpy.GetParameterAsText(7))
-    is_widen = arcpy.GetParameterAsText(8)
-    widentype = arcpy.GetParameterAsText(9)
-    widendist = float(arcpy.GetParameterAsText(10))
-    filtersize = int(arcpy.GetParameterAsText(11))
-    is_smooth = arcpy.GetParameterAsText(12)
-    is_parallel = arcpy.GetParameterAsText(13)
-    tilesize = int(arcpy.GetParameterAsText(14))
-
+def execute(demdataset,
+            marine,
+            output,
+            outputcellsize,
+            minacc1,
+            minlen1,
+            minacc2,
+            minlen2,
+            is_widen,
+            widentype,
+            widendist,
+            filtersize,
+            is_smooth,
+            is_parallel,
+            tilesize):
     workspace = os.path.dirname(output)
 
     # raster workspace MUST be a folder, no
@@ -355,22 +348,23 @@ if __name__ == '__main__':
     else:
         for oid in oids:
             try:
-                execute(oid,
-                        demdataset,
-                        marine,
-                        minacc1,
-                        minlen1,
-                        minacc2,
-                        minlen2,
-                        is_widen,
-                        widentype,
-                        widendist,
-                        filtersize,
-                        is_smooth,
-                        workspace,
-                        rastertinworkspace)
+                call(oid,
+                     demdataset,
+                     marine,
+                     fishbuffer,
+                     minacc1,
+                     minlen1,
+                     minacc2,
+                     minlen2,
+                     is_widen,
+                     widentype,
+                     widendist,
+                     filtersize,
+                     is_smooth,
+                     workspace,
+                     rastertinworkspace)
             except Exception:
-                arcpy.AddMessage("Failed to generalize dem" + str(oid-1))
+                arcpy.AddMessage("Failed to generalize dem" + str(oid - 1))
 
     arcpy.AddMessage("CLIPPING AND MASKING GENERALIZED RASTERS")
 
@@ -397,6 +391,47 @@ if __name__ == '__main__':
                                        "1",
                                        "BLEND",
                                        "FIRST")
+
+    return
+
+if __name__ == '__main__':
+
+    arcpy.CheckOutExtension("3D")
+    arcpy.CheckOutExtension("Spatial")
+
+    arcpy.env.overwriteOutput = True
+
+    demdataset = arcpy.GetParameterAsText(0)
+    marine = arcpy.GetParameterAsText(1)
+    output = arcpy.GetParameterAsText(2)
+    outputcellsize = float(arcpy.GetParameterAsText(3))
+    minacc1 = int(arcpy.GetParameterAsText(4))
+    minlen1 = int(arcpy.GetParameterAsText(5))
+    minacc2 = int(arcpy.GetParameterAsText(6))
+    minlen2 = int(arcpy.GetParameterAsText(7))
+    is_widen = arcpy.GetParameterAsText(8)
+    widentype = arcpy.GetParameterAsText(9)
+    widendist = float(arcpy.GetParameterAsText(10))
+    filtersize = int(arcpy.GetParameterAsText(11))
+    is_smooth = arcpy.GetParameterAsText(12)
+    is_parallel = arcpy.GetParameterAsText(13)
+    tilesize = int(arcpy.GetParameterAsText(14))
+
+    execute(demdataset,
+            marine,
+            output,
+            outputcellsize,
+            minacc1,
+            minlen1,
+            minacc2,
+            minlen2,
+            is_widen,
+            widentype,
+            widendist,
+            filtersize,
+            is_smooth,
+            is_parallel,
+            tilesize)
 
 
 
