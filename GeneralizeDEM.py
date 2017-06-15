@@ -259,6 +259,8 @@ def call(oid,
 
     arcpy.Delete_management(pointslyr)
 
+def worker(oid):
+    return oid
 
 def execute(demdataset,
             marine,
@@ -275,6 +277,12 @@ def execute(demdataset,
             is_smooth,
             is_parallel,
             tilesize):
+
+    arcpy.CheckOutExtension("3D")
+    arcpy.CheckOutExtension("Spatial")
+
+    arcpy.env.overwriteOutput = True
+
     workspace = os.path.dirname(output)
 
     # raster workspace MUST be a folder, no
@@ -316,7 +324,9 @@ def execute(demdataset,
     arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
     arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
 
+    arcpy.AddMessage('Making fishnet ')
     fishnet = workspace + "/fishnet"
+    arcpy.AddMessage('fishnet')
     arcpy.CreateFishnet_management(fishnet,
                                    str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin),
                                    str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin + 1),
@@ -324,13 +334,15 @@ def execute(demdataset,
                                    nrows, ncols,
                                    '', '',
                                    demsource.extent, 'POLYGON')
-
+    arcpy.AddMessage('Making buffer ')
     fishbuffer = workspace + "/fishbuffer"
     arcpy.Buffer_analysis(fishnet, fishbuffer, bufferwidth)
 
+    arcpy.AddMessage('Making mask buffer ')
     fishmaskbuffer = workspace + "/fishmaskbuffer"
     arcpy.Buffer_analysis(fishnet, fishmaskbuffer, max(demsource.meanCellHeight, demsource.meanCellWidth))
 
+    arcpy.AddMessage('Splitting raster ')
     arcpy.SplitRaster_management(demdataset,
                                  rastertinworkspace,
                                  'dem',
@@ -339,12 +351,34 @@ def execute(demdataset,
                                  '', '', '', '', '', '', '',
                                  fishbuffer)
 
+    arcpy.AddMessage('Creating cursor')
     rows = arcpy.da.SearchCursor(fishbuffer, 'OID@')
     oids = [row[0] for row in rows]
 
     # MAIN PROCESSING
     if is_parallel == 'true':
         arcpy.AddMessage('Trying to make multiprocessing')
+
+        prc = int(os.environ["NUMBER_OF_PROCESSORS"]) - 1
+
+        arcpy.AddMessage('Detected ' + str(prc) + ' processors')
+
+        # using Parellel python
+        ppservers = ()
+
+        # sets workers to prc
+        job_server = pp.Server(prc, ppservers=ppservers)
+
+        jobs = []
+
+        for oid in oids:
+            jobs.append(job_server.submit(func=worker, args=(oid,)))
+
+        # Retrieve results of all submited jobs
+        for job in jobs:
+            print job()
+            arcpy.AddMessage(job())
+
     else:
         for oid in oids:
             try:
@@ -396,11 +430,6 @@ def execute(demdataset,
 
 if __name__ == '__main__':
 
-    arcpy.CheckOutExtension("3D")
-    arcpy.CheckOutExtension("Spatial")
-
-    arcpy.env.overwriteOutput = True
-
     demdataset = arcpy.GetParameterAsText(0)
     marine = arcpy.GetParameterAsText(1)
     output = arcpy.GetParameterAsText(2)
@@ -417,21 +446,10 @@ if __name__ == '__main__':
     is_parallel = arcpy.GetParameterAsText(13)
     tilesize = int(arcpy.GetParameterAsText(14))
 
-    execute(demdataset,
-            marine,
-            output,
-            outputcellsize,
-            minacc1,
-            minlen1,
-            minacc2,
-            minlen2,
-            is_widen,
-            widentype,
-            widendist,
-            filtersize,
-            is_smooth,
-            is_parallel,
-            tilesize)
+    execute(demdataset, marine, output, outputcellsize,
+            minacc1, minlen1, minacc2, minlen2,
+            is_widen, widentype, widendist, filtersize,
+            is_smooth, is_parallel, tilesize)
 
 
 
