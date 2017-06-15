@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="27551e22-afbb-4a97-9246-bda30e28d16a" name="Default" comment="Corrected variable and function naming for general conventions">
+    <list default="true" id="27551e22-afbb-4a97-9246-bda30e28d16a" name="Default" comment="Created call() and execute() funtions in GeneralizeDEM.py for convenient external calls.">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GeneralizeDEM.py" afterPath="$PROJECT_DIR$/GeneralizeDEM.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -56,8 +55,8 @@
       <file leaf-file-name="GeneralizeDEM.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/GeneralizeDEM.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="254">
-              <caret line="262" column="0" lean-forward="false" selection-start-line="262" selection-start-column="0" selection-end-line="262" selection-end-column="0" />
+            <state relative-caret-position="554">
+              <caret line="282" column="13" lean-forward="true" selection-start-line="282" selection-start-column="13" selection-end-line="282" selection-end-column="13" />
               <folding>
                 <element signature="e#268#280#0" expanded="true" />
               </folding>
@@ -403,7 +402,14 @@
       <option name="project" value="LOCAL" />
       <updated>1496854765863</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Created call() and execute() funtions in GeneralizeDEM.py for convenient external calls.">
+      <created>1497521157281</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1497521157281</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
@@ -420,7 +426,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="23" width="1440" height="838" extended-state="6" />
-    <editor active="false" />
+    <editor active="true" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24594785" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -481,9 +487,10 @@
   <component name="VcsManagerConfiguration">
     <option name="CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT" value="true" />
     <MESSAGE value="Added New Numpy Version of TraceFlowLines Algorithm" />
-    <MESSAGE value="Corrected variable and function naming for general conventions" />
     <MESSAGE value="Rewritten FilterDEM module using numpy arrays instead of matrices" />
-    <option name="LAST_COMMIT_MESSAGE" value="Rewritten FilterDEM module using numpy arrays instead of matrices" />
+    <MESSAGE value="Corrected variable and function naming for general conventions" />
+    <MESSAGE value="Created call() and execute() funtions in GeneralizeDEM.py for convenient external calls." />
+    <option name="LAST_COMMIT_MESSAGE" value="Created call() and execute() funtions in GeneralizeDEM.py for convenient external calls." />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -749,8 +756,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/GeneralizeDEM.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="254">
-          <caret line="262" column="0" lean-forward="false" selection-start-line="262" selection-start-column="0" selection-end-line="262" selection-end-column="0" />
+        <state relative-caret-position="554">
+          <caret line="282" column="13" lean-forward="true" selection-start-line="282" selection-start-column="13" selection-end-line="282" selection-end-column="13" />
           <folding>
             <element signature="e#268#280#0" expanded="true" />
           </folding>
