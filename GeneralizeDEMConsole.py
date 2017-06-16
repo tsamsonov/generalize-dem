@@ -1,74 +1,54 @@
-import GeneralizeDEM
-import multiprocessing
-import arcpy
+import sys
 import time
-
-def worker(oid):
-    arcpy.AddMessage('Yeah')
-    time.sleep(5)
-    return oid
+import arcpy
+import traceback
+import GeneralizeDEM
 
 if __name__ == '__main__':
 
+    # SET PARAMETERS HERE
+    # --------------------------------------------------------------------
     demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/mistral'
     marine = None
-    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/parallel'
+    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/mistral_gen'
     outputcellsize = 1000
     minacc1 = 40
-    minlen1 = 20
+    minlen1 = 10
     minacc2 = 20
-    minlen2 = 10
+    minlen2 = 5
     is_widen = 'true'
-    widentype = 0
-    widendist = 0
-    filtersize = 0
+    widentype = 'Min/Max'
+    widendist = 4000
+    filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 512
+    tilesize = 1024
+    # --------------------------------------------------------------------
 
+    print('> Initializing GeneralizeDEM script...')
+    print('')
+
+    start = int(time.time())
     try:
         GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
                               minacc1, minlen1, minacc2, minlen2,
                               is_widen, widentype, widendist, filtersize,
                               is_smooth, is_parallel, tilesize)
     except Exception:
-        print("Quit with error...")
-        input("Press Enter to continue...")
+        tb = sys.exc_info()[2]
+        tbinfo = traceback.format_tb(tb)[0]
+        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
+        arcpy.AddError(pymsg)
+        print("Processing failed")
 
-    # arcpy.AddMessage('Trying to make multiprocessing')
-    # arcpy.AddMessage('Creating Pool')
-    # pool = multiprocessing.Pool(processes=3)
-    # jobs = []
-    # oids = [1, 2, 3, 4, 5]
-    # arcpy.AddMessage(multiprocessing.cpu_count())
+    finish = int(time.time())
+    seconds = finish - start
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
 
-    # PROCESS
-    # try:
-    #     for oid in oids:
-    #         p = multiprocessing.Process(target = worker, args = (oid,))
-    #         jobs.append(p)
-    #         p.start()
-    #     for job in jobs:
-    #         job.join()
-    # except:
-    #     input("Press Enter to continue...")
-
-    # POOL ASYNC
-    # try:
-    #     for oid in oids:
-    #         pool.apply_async(worker, (oid,))
-    #     pool.close()
-    #     pool.join()
-    # except:
-    #     input("Press Enter to continue...")
-
-    # POOL MAP
-    # try:
-    #     pool.map(worker, oids)
-    #     pool.close()
-    #     pool.join()
-    # except:
-    #     input("Press Enter to continue...")
-
+    print ''
+    print "> Finished in %02d h %02d m %02d s" % (h, m, s)
+    print ''
 
     input("Press Enter to continue...")
