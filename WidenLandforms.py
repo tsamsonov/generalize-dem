@@ -12,16 +12,13 @@ __author__ = 'Timofey Samsonov'
 
 
 def execute(demdataset, streams, distance, windowsize, output, ftype):
-    # arcpy.env.workspace = "in_memory"
 
     arcpy.CheckOutExtension("Spatial")
-    arcpy.CheckOutExtension("3D")
 
-    # arcpy.env.workspace = os.path.dirname(output)
-    # arcpy.env.scratchworkspace = os.path.dirname(output)
+    workspace = os.path.dirname(output)
 
     arcpy.env.snapRaster = demdataset
-    dem = arcpy.sa.Raster(demdataset)
+    dem = arcpy.Raster(demdataset)
     cellsize = dem.meanCellHeight
 
     # Calculate distances from streams
@@ -30,11 +27,8 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
 
     # Derive valleys weights
     arcpy.AddMessage("Calculating valley weights...")
-    arcpy.AddMessage("Divide")
     divdist = Divide(distances, distance)
-    arcpy.AddMessage("Minus")
     divdistminus = Minus(1, divdist)
-    arcpy.AddMessage("Con")
     w_valleys = Con(divdistminus, 0, divdistminus, "value < 0")
 
     # Derive ridges weights
@@ -59,8 +53,8 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
         valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
         ridges = FocalStatistics(dem, neighborhood, "MAXIMUM", "DATA")
     else:
-        val = arcpy.env.workspace + "val"
-        rig = arcpy.env.workspace + "rig"
+        val = workspace + "/val"
+        rig = workspace + "/rig"
         FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile")
         FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile")
         valleys = arcpy.Raster(val)
@@ -90,7 +84,6 @@ if __name__ == "__main__":
         ftype = arcpy.GetParameterAsText(5)
 
         execute(demdataset, streams, distance, windowsize, output, ftype)
-
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
