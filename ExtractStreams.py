@@ -1,10 +1,12 @@
 # -*- coding: cp1251 -*-
 # Raster stream network generalization by Leonowicz-Jenny algorithm
 # 2017, Timofey Samsonov, Lomonosov Moscow State University
-import arcpy, numpy, sys, traceback
+import sys
+import arcpy
+import numpy
+import traceback
 
 MAXACC = 0
-
 
 def find_up_cell(accraster, i, j):
     w = [[0.70710678, 1, 0.70710678],[1, 1, 1], [0.70710678, 1, 0.70710678]]  # distance weights
@@ -134,17 +136,11 @@ def execute(inraster, outraster, minacc, minlen):
 
 if __name__ == "__main__":
     try:
-
-        arcpy.AddMessage('Reading parameters')
-        # Get input parameters
         inRaster = arcpy.GetParameterAsText(0)
         outRaster = arcpy.GetParameterAsText(1)
         minAcc = float(arcpy.GetParameterAsText(2))
         minLen = long(arcpy.GetParameterAsText(3))
 
-        arcpy.AddMessage('Executing')
-
-        # Execute processing
         execute(inRaster, outRaster, minAcc, minLen)
     except:
         tb = sys.exc_info()[2]
