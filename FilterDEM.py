@@ -3,7 +3,6 @@ import arcpy
 import sys
 import traceback
 import math
-import os
 import numpy
 
 shift = []
@@ -91,7 +90,6 @@ filters = {0: calc_lower_quartile,
            4: calc_mean,
            5: calc_median
 }
-
 
 def extend_array(array, nx, ny, value):
     ni = array.shape[0]
@@ -182,7 +180,6 @@ def execute(inraster, outraster, wsize, niter, qtype):
 
 if __name__ == "__main__":
     try:
-        # Get input parameters
         inRaster = arcpy.GetParameterAsText(0)
         outRaster = arcpy.GetParameterAsText(1)
         wSize = int(arcpy.GetParameterAsText(2))
@@ -190,7 +187,6 @@ if __name__ == "__main__":
         qType = arcpy.GetParameterAsText(4)
 
         execute(inRaster, outRaster, wSize, nIter, qType)
-
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
