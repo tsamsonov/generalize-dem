@@ -9,10 +9,16 @@ import math
 import pp
 import multiprocessing
 import time
+import shutil
+import sys
+import traceback
 from arcpy.sa import *
 import os.path, ExtractStreams, WidenLandforms
 __author__ = 'Timofey Samsonov'
 
+def tin_to_raster(tin, rastertin, rastertype, method, cellsize, factor):
+    arcpy.TinRaster_3d(tin, rastertin, rastertype, method, cellsize, factor)
+    return
 
 def call(oid,
          demdataset,
@@ -33,6 +39,7 @@ def call(oid,
         arcpy.CheckOutExtension("3D")
 
         arcpy.CreateFolder_management(scratchworkspace + '/processing', 'dem' + str(oid))
+
         rastertinworkspace = scratchworkspace + '/processing/dem' + str(oid)
 
         gdb_name = 'dem' + str(oid) + '.gdb'
@@ -65,21 +72,28 @@ def call(oid,
         marine_area = None
         process_marine = False
         if marine:
+            arcpy.AddMessage("Extracting marine area...")
             marine_area = workspace + "/land" + str(i)
             arcpy.Clip_analysis(marine, cell[0], marine_area)
             if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
                 cell_erased = workspace + "/cell_erased" + str(i)
                 arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
-                dem = ExtractByMask(dem0, cell_erased)
-                dem.save(rastertinworkspace + '/' + raster + "_e")
-                dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
-                process_marine = True
+
+                nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
+
+                if nareas == 0:
+                    arcpy.AddMessage('NOTHING TO GENERALIZE: The cell is completely in the marine area. Finishing...')
+                    return False
+                else:
+                    dem = ExtractByMask(dem0, cell_erased)
+                    dem.save(rastertinworkspace + '/' + raster + "_e")
+                    dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
+                    process_marine = True
 
         cellsize = dem.meanCellHeight
 
         arcpy.AddMessage("PREPROCESSING")
 
-        arcpy.AddMessage(dem)
         arcpy.AddMessage("Fill...")
         fill = Fill(dem, "")
         arcpy.AddMessage("Dir...")
@@ -204,7 +218,7 @@ def call(oid,
 
         marine_3d = workspace + "/marine_3d"
         if process_marine:
-            arcpy.InterpolateShape_3d(dem0, marine_area, marine_3d)
+            arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d)
 
         # GENERALIZED TIN SURFACE
 
@@ -234,7 +248,28 @@ def call(oid,
 
         rastertin = rastertinworkspace + "/rastertin"
         try:
+            # arcpy.AddMessage("Creating process")
+            # p = multiprocessing.Process(tin_to_raster,
+            #                             args=(tin, rastertin, "FLOAT", "NATURAL_NEIGHBORS", "CELLSIZE " + str(cellsize), 1)
+            # )
+            #
+            # arcpy.AddMessage("Starting process")
+            # p.start()
+            #
+            # # Wait for 30 seconds or until process finishes
+            # arcpy.AddMessage("Waiting for finish")
+            # p.join(30)
+            #
+            # # If thread is still active
+            # if p.is_alive():
+            #     print "Rasterizing TIN using NATURAL_NEIGHBORS takes too long time (> 1 min). It seems that process is freezed"
+            #     # Terminate
+            #     p.terminate()
+            #     p.join()
+            #     raise Exception
+
             arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "NATURAL_NEIGHBORS", "CELLSIZE " + str(cellsize), 1)
+
         except Exception:
             arcpy.AddMessage("Failed to rasterize TIN using NATURAL_NEIGHBORS method. Switching to linear")
             arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "LINEAR", "CELLSIZE " + str(cellsize), 1)
@@ -267,9 +302,58 @@ def call(oid,
             arcpy.AddMessage("Saving result...")
             result.save(scratchworkspace + '/gen/dem' + str(i))
 
+        arcpy.AddMessage("CLEANING TEMPORARY DATA")
+
+        arcpy.Delete_management(str1_0)
+        arcpy.Delete_management(str2_0)
+        arcpy.Delete_management(streams1)
+        arcpy.Delete_management(endpoints1)
+        arcpy.Delete_management(endbuffers1)
+        arcpy.Delete_management(rendbuffers1)
+        arcpy.Delete_management(streams1_e)
+        arcpy.Delete_management(endpoints1_e)
+        arcpy.Delete_management(watersheds1)
+        arcpy.Delete_management(streams2_e)
+        arcpy.Delete_management(endpoints2_e)
+        arcpy.Delete_management(streambuffer)
         arcpy.Delete_management(pointslyr)
-    except Exception:
+        arcpy.Delete_management(pourpts2)
+        arcpy.Delete_management(watersheds2)
+        arcpy.Delete_management(streams1_3d)
+        arcpy.Delete_management(watersheds1_3d)
+        arcpy.Delete_management(watersheds2_3d)
+        arcpy.Delete_management(tin)
+        arcpy.Delete_management(rastertin)
+        arcpy.Delete_management(widenraster)
+
+        arcpy.Delete_management(fill)
+        arcpy.Delete_management(dir)
+        arcpy.Delete_management(acc)
+        arcpy.Delete_management(str1)
+        arcpy.Delete_management(str2)
+        arcpy.Delete_management(mask)
+        arcpy.Delete_management(str1_e)
+        arcpy.Delete_management(str2_e)
+        arcpy.Delete_management(pour1)
+        arcpy.Delete_management(pour21)
+        arcpy.Delete_management(pour22)
+        arcpy.Delete_management(wsh1)
+        arcpy.Delete_management(wsh2)
+        arcpy.Delete_management(acc_e)
+
+        arcpy.Delete_management(workspace)
+        arcpy.Delete_management(rastertinworkspace)
+
+        arcpy.CheckInExtension("3D")
+        arcpy.CheckInExtension("Spatial")
+
+    except:
         arcpy.AddMessage("Failed to generalize tile dem" + str(oid - 1))
+        tb = sys.exc_info()[2]
+        tbinfo = traceback.format_tb(tb)[0]
+        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
+        arcpy.AddError(pymsg)
 
 def execute(demdataset,
             marine,
@@ -290,7 +374,6 @@ def execute(demdataset,
     arcpy.CheckOutExtension("3D")
     arcpy.CheckOutExtension("Spatial")
     arcpy.env.overwriteOutput = True
-
 
     # ORGANIZE WORKSPACE
 
@@ -376,7 +459,7 @@ def execute(demdataset,
     if is_parallel == 'true':
         nproc = multiprocessing.cpu_count()
 
-        arcpy.AddMessage('Trying to make multiprocessing using ' + str(nproc) + ' processor cores')
+        arcpy.AddMessage('> Trying to make multiprocessing using ' + str(nproc) + ' processor cores')
         arcpy.AddMessage('')
 
         pool = multiprocessing.Pool(nproc)
@@ -399,6 +482,8 @@ def execute(demdataset,
         pool.join()
 
     else:
+        arcpy.AddMessage('> Processing in sequential mode')
+        arcpy.AddMessage('')
         for oid in oids:
             call(oid,
                  demdataset,
@@ -422,27 +507,31 @@ def execute(demdataset,
     rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
     i = 0
     for row in rows:
-        dem = arcpy.Raster(scratchworkspace + '/gen/dem' + str(i))
-        dem_clipped = ExtractByMask(dem, row[0])
-        dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
+        raster = scratchworkspace + '/gen/dem' + str(i)
+        if arcpy.Exists(raster):
+            dem = arcpy.Raster(raster)
+            dem_clipped = ExtractByMask(dem, row[0])
+            dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
         i += 1
 
     arcpy.env.workspace = scratchworkspace + '/gencrop/'
-
     rasters = arcpy.ListRasters("*", "GRID")
 
-    rasters_str = ';'.join(rasters)
+    if len(rasters) > 0:
+        rasters_str = ';'.join(rasters)
+        arcpy.AddMessage('SAVING RESULT')
+        arcpy.MosaicToNewRaster_management(rasters_str,
+                                           os.path.dirname(output),
+                                           os.path.basename(output),
+                                           "",
+                                           "16_BIT_SIGNED",
+                                           str(outputcellsize),
+                                           "1",
+                                           "BLEND",
+                                           "FIRST")
+    else:
+        arcpy.AddMessage('NOTHING GENERALIZED')
 
-    arcpy.AddMessage('SAVING RESULT')
-    arcpy.MosaicToNewRaster_management(rasters_str,
-                                       os.path.dirname(output),
-                                       os.path.basename(output),
-                                       "",
-                                       "16_BIT_SIGNED",
-                                       str(outputcellsize),
-                                       "1",
-                                       "BLEND",
-                                       "FIRST")
     return
 
 if __name__ == '__main__':
