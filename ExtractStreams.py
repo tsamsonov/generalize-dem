@@ -42,31 +42,42 @@ def trace_flow_cells(accraster, streamraster, i, j, stream, minacc, minlen):
     ik = i
     jk = j
     n = 0
-    
-    while n < minlen:
-        stream[n] = [ik, jk]
-        iup, jup = find_up_cell(accraster, ik, jk)
-        acc = accraster[iup, jup]
-        if acc < minacc:
-            break
-        if iup == ik and jup == jk:
-            break
-        ik = iup
-        jk = jup
-        n += 1
-    
-    if n == minlen:
-        for k in range(n):
-            streamraster[stream[k][0], stream[k][1]] = 1
-        while acc > minacc:
-            streamraster[iup, jup] = 1
+
+    try:
+        while n < minlen:
+            stream[n] = [ik, jk]
             iup, jup = find_up_cell(accraster, ik, jk)
+
+            acc = accraster[iup, jup]
+            if acc < minacc:
+                break
             if iup == ik and jup == jk:
                 break
-            acc = accraster[iup, jup]
+
             ik = iup
             jk = jup
             n += 1
+
+        if n == minlen:
+            for k in range(n):
+                streamraster[stream[k][0], stream[k][1]] = 1
+            while acc > minacc:
+                streamraster[iup, jup] = 1
+                iup, jup = find_up_cell(accraster, ik, jk)
+                if iup == ik and jup == jk:
+                    break
+                acc = accraster[iup, jup]
+                ik = iup
+                jk = jup
+                n += 1
+
+    except:
+        tb = sys.exc_info()[2]
+        tbinfo = traceback.format_tb(tb)[0]
+        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
+        arcpy.AddError(pymsg)
+        raise Exception
 
     return streamraster
 
@@ -87,37 +98,38 @@ def extend_array(array, nx, ny, value):
 
 def process_raster(inraster, minacc, minlen):
 
-    arcpy.AddMessage("Streaming...")
-    stream = [[0, 0] for i in range(minlen)]
-    ni = inraster.shape[0]
-    nj = inraster.shape[1]
+    try:
+        stream = [[0, 0] for i in range(minlen)]
+        ni = inraster.shape[0]
+        nj = inraster.shape[1]
 
-    global MAXACC
+        global MAXACC
 
-    arcpy.AddMessage("Zeroing...")
-    outraster = numpy.zeros((ni, nj))
+        outraster = numpy.zeros((ni, nj))
+        extinraster = extend_array(inraster, 1, 1, MAXACC + 1)
+        arcpy.SetProgressor("step", "Processing rows", 0, ni - 1, 1)
+        for i in range(ni):
+            arcpy.SetProgressorLabel("Processing row " + str(i) + " from " + str(ni))
+            for j in range(nj):
+                if  minacc < inraster[i, j] <= MAXACC:
+                    trace_flow_cells(extinraster, outraster, i, j, stream, minacc, minlen)
+            arcpy.SetProgressorPosition(i)
 
-    arcpy.AddMessage("Extending...")
-    extinraster = extend_array(inraster, 1, 1, MAXACC * 10)
-
-    arcpy.AddMessage("Tracing...")
-
-    arcpy.SetProgressor("step", "Processing rows", 0, ni - 1, 1)
-    for i in range(ni):
-        arcpy.SetProgressorLabel("Processing row " + str(i) + " from " + str(ni))
-        for j in range(nj):
-            if inraster[i, j] > minacc:
-                trace_flow_cells(extinraster, outraster, i, j, stream, minacc, minlen)
-        arcpy.SetProgressorPosition(i)
-
-    return outraster
+        return outraster
+    except:
+        tb = sys.exc_info()[2]
+        tbinfo = traceback.format_tb(tb)[0]
+        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                str(sys.exc_type)+ ": " + str(sys.exc_value) + "\n"
+        arcpy.AddError(pymsg)
+        raise Exception
 
 
 def execute(inraster, outraster, minacc, minlen):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
 
-    rasternumpy = arcpy.RasterToNumPyArray(inraster)
+    rasternumpy = arcpy.RasterToNumPyArray(inraster, nodata_to_value = MAXACC + 1)
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing stream lines...")
