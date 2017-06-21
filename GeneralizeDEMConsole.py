@@ -10,7 +10,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------
     demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/kamokh'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/kamokh_gen'
+    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/kamokh_gen_new2'
     outputcellsize = 1000
     minacc1 = 40
     minlen1 = 10
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 512
+    tilesize = 300
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')
