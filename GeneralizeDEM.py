@@ -6,10 +6,8 @@
 
 import arcpy
 import math
-import pp
 import multiprocessing
 import time
-import shutil
 import sys
 import traceback
 from arcpy.sa import *
