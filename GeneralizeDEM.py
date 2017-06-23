@@ -487,6 +487,8 @@ def execute(demdataset,
             arcpy.AddMessage('')
 
             pool = multiprocessing.Pool(nproc)
+            i = 0 # number of processes in current pool
+            k = 0 # total number of processes
             for oid in oids:
                 jobs.append(pool.apply_async(call, (oid,
                                         demdataset,
@@ -502,8 +504,20 @@ def execute(demdataset,
                                         filtersize,
                                         is_smooth,
                                         scratchworkspace,)))
-            pool.close()
-            pool.join()
+                i+=1
+                k+=1
+                if i == nproc:
+                    pool.close()
+                    pool.join()
+
+                    if k < len(oids):
+                        arcpy.AddMessage('\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
+                        pool = multiprocessing.Pool(nproc)
+
+                    i = 0
+            if i > 0:
+                pool.close()
+                pool.join()
 
             falseoids = []
             for state, oid in zip(jobs, oids):
@@ -516,6 +530,8 @@ def execute(demdataset,
                 if answer in ('y', 'Y'):
                     jobs = []
                     pool = multiprocessing.Pool(nproc)
+                    i = 0
+                    k = 0
                     for falseoid in falseoids:
                         jobs.append(pool.apply_async(call, (falseoid,
                                                             demdataset,
@@ -531,8 +547,24 @@ def execute(demdataset,
                                                             filtersize,
                                                             is_smooth,
                                                             scratchworkspace,)))
-                    pool.close()
-                    pool.join()
+                        i += 1
+                        k += 1
+                        if i == nproc:
+                            pool.close()
+                            pool.join()
+
+                            if k < len(falseoids):
+                                arcpy.AddMessage(
+                                    '\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
+                                arcpy.AddMessage('')
+                                pool = multiprocessing.Pool(nproc)
+
+                            i = 0
+
+                    if i > 0:
+                        pool.close()
+                        pool.join()
+
         else:
             arcpy.AddMessage('> Processing in sequential mode')
             arcpy.AddMessage('')
