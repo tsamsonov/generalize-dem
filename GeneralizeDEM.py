@@ -11,12 +11,43 @@ import time
 import sys
 import traceback
 from arcpy.sa import *
+from itertools import repeat
 import os.path, ExtractStreams, WidenLandforms
 __author__ = 'Timofey Samsonov'
 
 def tin_to_raster(tin, rastertin, rastertype, method, cellsize, factor):
     arcpy.TinRaster_3d(tin, rastertin, rastertype, method, cellsize, factor)
     return
+
+def call_list((oid,
+         demdataset,
+         marine,
+         fishbuffer,
+         minacc1,
+         minlen1,
+         minacc2,
+         minlen2,
+         is_widen,
+         widentype,
+         widendist,
+         filtersize,
+         is_smooth,
+         scratchworkspace)):
+
+    return call(oid,
+         demdataset,
+         marine,
+         fishbuffer,
+         minacc1,
+         minlen1,
+         minacc2,
+         minlen2,
+         is_widen,
+         widentype,
+         widendist,
+         filtersize,
+         is_smooth,
+         scratchworkspace)
 
 def call(oid,
          demdataset,
@@ -487,83 +518,103 @@ def execute(demdataset,
             arcpy.AddMessage('')
 
             pool = multiprocessing.Pool(nproc)
-            i = 0 # number of processes in current pool
-            k = 0 # total number of processes
-            for oid in oids:
-                jobs.append(pool.apply_async(call, (oid,
-                                        demdataset,
-                                        marine,
-                                        fishbuffer,
-                                        minacc1,
-                                        minlen1,
-                                        minacc2,
-                                        minlen2,
-                                        is_widen,
-                                        widentype,
-                                        widendist,
-                                        filtersize,
-                                        is_smooth,
-                                        scratchworkspace,)))
-                i+=1
-                k+=1
-                if i == nproc:
-                    pool.close()
-                    pool.join()
 
-                    if k < len(oids):
-                        arcpy.AddMessage('\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
-                        pool = multiprocessing.Pool(nproc)
+            args = zip(oids, repeat(demdataset),
+                             repeat(marine),
+                             repeat(fishbuffer),
+                             repeat(minacc1),
+                             repeat(minlen1),
+                             repeat(minacc2),
+                             repeat(minlen2),
+                             repeat(is_widen),
+                             repeat(widentype),
+                             repeat(widendist),
+                             repeat(filtersize),
+                             repeat(is_smooth),
+                             repeat(scratchworkspace))
 
-                    i = 0
-            if i > 0:
-                pool.close()
-                pool.join()
+            pool.map(call_list, args)
 
-            falseoids = []
-            for state, oid in zip(jobs, oids):
-                if state.get() == False:
-                    falseoids.append(oid)
+            pool.close()
+            pool.join()
 
-            if len(falseoids) > 0:
-                arcpy.AddMessage('\n> FAILED to generalize tiles with OID = ' + str(falseoids) + '\n')
-                answer = raw_input("\n> Press 'y' if you want to try them to generalize once more time...\n")
-                if answer in ('y', 'Y'):
-                    jobs = []
-                    pool = multiprocessing.Pool(nproc)
-                    i = 0
-                    k = 0
-                    for falseoid in falseoids:
-                        jobs.append(pool.apply_async(call, (falseoid,
-                                                            demdataset,
-                                                            marine,
-                                                            fishbuffer,
-                                                            minacc1,
-                                                            minlen1,
-                                                            minacc2,
-                                                            minlen2,
-                                                            is_widen,
-                                                            widentype,
-                                                            widendist,
-                                                            filtersize,
-                                                            is_smooth,
-                                                            scratchworkspace,)))
-                        i += 1
-                        k += 1
-                        if i == nproc:
-                            pool.close()
-                            pool.join()
-
-                            if k < len(falseoids):
-                                arcpy.AddMessage(
-                                    '\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
-                                arcpy.AddMessage('')
-                                pool = multiprocessing.Pool(nproc)
-
-                            i = 0
-
-                    if i > 0:
-                        pool.close()
-                        pool.join()
+            # i = 0 # number of processes in current pool
+            # k = 0 # total number of processes
+            # for oid in oids:
+            #     jobs.append(pool.apply_async(call, (oid,
+            #                             demdataset,
+            #                             marine,
+            #                             fishbuffer,
+            #                             minacc1,
+            #                             minlen1,
+            #                             minacc2,
+            #                             minlen2,
+            #                             is_widen,
+            #                             widentype,
+            #                             widendist,
+            #                             filtersize,
+            #                             is_smooth,
+            #                             scratchworkspace,)))
+            #     i+=1
+            #     k+=1
+            #     if i == nproc:
+            #         pool.close()
+            #         pool.join()
+            #
+            #         if k < len(oids):
+            #             arcpy.AddMessage('\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
+            #             pool = multiprocessing.Pool(nproc)
+            #
+            #         i = 0
+            # if i > 0:
+            #     pool.close()
+            #     pool.join()
+            #
+            # falseoids = []
+            # for state, oid in zip(jobs, oids):
+            #     if state.get() == False:
+            #         falseoids.append(oid)
+            #
+            # if len(falseoids) > 0:
+            #     arcpy.AddMessage('\n> FAILED to generalize tiles with OID = ' + str(falseoids) + '\n')
+            #     answer = raw_input("\n> Press 'y' if you want to try them to generalize once more time...\n")
+            #     if answer in ('y', 'Y'):
+            #         jobs = []
+            #         pool = multiprocessing.Pool(nproc)
+            #         i = 0
+            #         k = 0
+            #         for falseoid in falseoids:
+            #             jobs.append(pool.apply_async(call, (falseoid,
+            #                                                 demdataset,
+            #                                                 marine,
+            #                                                 fishbuffer,
+            #                                                 minacc1,
+            #                                                 minlen1,
+            #                                                 minacc2,
+            #                                                 minlen2,
+            #                                                 is_widen,
+            #                                                 widentype,
+            #                                                 widendist,
+            #                                                 filtersize,
+            #                                                 is_smooth,
+            #                                                 scratchworkspace,)))
+            #             i += 1
+            #             k += 1
+            #             if i == nproc:
+            #                 pool.close()
+            #                 pool.join()
+            #
+            #                 if k < len(falseoids):
+            #                     arcpy.AddMessage(
+            #                         '\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
+            #                     arcpy.AddMessage('')
+            #                     pool = multiprocessing.Pool(nproc)
+            #
+            #                 i = 0
+            #
+            #         if i > 0:
+            #             pool.close()
+            #             pool.join()
 
         else:
             arcpy.AddMessage('> Processing in sequential mode')
