@@ -88,7 +88,7 @@ def call(oid,
         arcpy.env.workspace = workspace
 
         i = int(oid)-1
-        raster = 'dem0_' + str(i)
+        raster = 'dem' + str(i)
 
         N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
 
@@ -406,7 +406,7 @@ def call(oid,
 
         return False
 
-def createFishnet(workspace, output, nrows, ncols, overlap, template, split = False):
+def createFishnet(workspace, output, nrows, ncols, overlap, template, split = False, overlap2 = None):
     desc = arcpy.Describe(template)
 
     xmin = desc.extent.XMin
@@ -455,19 +455,44 @@ def createFishnet(workspace, output, nrows, ncols, overlap, template, split = Fa
                 y += wy1
                 ycoords.append(y)
     else:
-        x = xmin
-        for i in range(ncols):
-            xcoords.append(x)
-            x += wx
-            xcoords.append(x)
-            x -= overlap
+        if overlap2 == None:
+            x = xmin
+            for i in range(ncols):
+                xcoords.append(x)
+                x += wx
+                xcoords.append(x)
+                x -= overlap
 
-        y = ymin
-        for j in range(nrows):
-            ycoords.append(y)
-            y += wy
-            ycoords.append(y)
-            y -= overlap
+            y = ymin
+            for j in range(nrows):
+                ycoords.append(y)
+                y += wy
+                ycoords.append(y)
+                y -= overlap
+        else:
+            wx0 = wx - 0.5 * overlap + 0.5 * overlap2
+            wx1 = wx - overlap + overlap2
+            x = xmin
+            for i in range(ncols):
+                xcoords.append(x)
+                if i == 0 or i == ncols - 1:
+                    x += wx0
+                else:
+                    x += wx1
+                xcoords.append(x)
+                x -= overlap2
+
+            wy0 = wy - 0.5 * overlap + 0.5 * overlap2
+            wy1 = wy - overlap + overlap2
+            y = ymin
+            for j in range(nrows):
+                ycoords.append(y)
+                if j == 0 or j == nrows - 1:
+                    y += wy0
+                else:
+                    y += wy1
+                ycoords.append(y)
+                y -= overlap2
 
         jdx = range(0, 2 * nrows, 2)
         idx = range(0, 2 * ncols, 2)
@@ -580,7 +605,7 @@ def execute(demdataset,
         arcpy.AddMessage('Creating mask buffer...')
         mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
         fishmaskbuffer = workspace + "/fishmaskbuffer"
-        createFishnet(workspace, 'fishmaskbuffer', nrows, ncols, mask_overlap, demdataset, split=False)
+        createFishnet(workspace, 'fishmaskbuffer', nrows, ncols, overlap, demdataset, split=False, overlap2 = mask_overlap)
         # arcpy.Buffer_analysis(fishnet, fishmaskbuffer, max(demsource.meanCellHeight, demsource.meanCellWidth))
 
 
@@ -619,7 +644,7 @@ def execute(demdataset,
 
             args = zip(oids, repeat(demdataset),
                              repeat(marine),
-                             repeat(fishnet),
+                             repeat(fishbuffer),
                              repeat(minacc1),
                              repeat(minlen1),
                              repeat(minacc2),
