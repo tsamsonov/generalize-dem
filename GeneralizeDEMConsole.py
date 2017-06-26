@@ -22,7 +22,7 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 300
+    tilesize = 512
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')
