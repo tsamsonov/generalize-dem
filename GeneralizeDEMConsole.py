@@ -8,9 +8,9 @@ if __name__ == '__main__':
 
     # SET PARAMETERS HERE
     # --------------------------------------------------------------------
-    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/kamokh'
+    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/magadan'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/kamokh_poolmap'
+    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/magadan_gen'
     outputcellsize = 1000
     minacc1 = 40
     minlen1 = 10
