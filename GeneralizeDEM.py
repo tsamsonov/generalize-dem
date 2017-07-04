@@ -12,14 +12,44 @@ import sys
 import traceback
 from arcpy.sa import *
 from itertools import repeat
-import os.path, ExtractStreams, WidenLandforms
+import os.path, ExtractStreams, WidenLandforms, CreateFishnet
 __author__ = 'Timofey Samsonov'
 
-def tin_to_raster(tin, rastertin, rastertype, method, cellsize, factor):
-    arcpy.TinRaster_3d(tin, rastertin, rastertype, method, cellsize, factor)
-    return
+# def tin_to_raster(tin, rastertin, rastertype, method, cellsize, factor):
+#     arcpy.TinRaster_3d(tin, rastertin, rastertype, method, cellsize, factor)
+#     return
 
-def call_list((oid,
+# def call_list((oid,
+#          demdataset,
+#          marine,
+#          fishbuffer,
+#          minacc1,
+#          minlen1,
+#          minacc2,
+#          minlen2,
+#          is_widen,
+#          widentype,
+#          widendist,
+#          filtersize,
+#          is_smooth,
+#          scratchworkspace)):
+#
+#     return call(oid,
+#          demdataset,
+#          marine,
+#          fishbuffer,
+#          minacc1,
+#          minlen1,
+#          minacc2,
+#          minlen2,
+#          is_widen,
+#          widentype,
+#          widendist,
+#          filtersize,
+#          is_smooth,
+#          scratchworkspace)
+
+def call((oid,
          demdataset,
          marine,
          fishbuffer,
@@ -33,39 +63,23 @@ def call_list((oid,
          filtersize,
          is_smooth,
          scratchworkspace)):
-
-    return call(oid,
-         demdataset,
-         marine,
-         fishbuffer,
-         minacc1,
-         minlen1,
-         minacc2,
-         minlen2,
-         is_widen,
-         widentype,
-         widendist,
-         filtersize,
-         is_smooth,
-         scratchworkspace)
-
-def call(oid,
-         demdataset,
-         marine,
-         fishbuffer,
-         minacc1,
-         minlen1,
-         minacc2,
-         minlen2,
-         is_widen,
-         widentype,
-         widendist,
-         filtersize,
-         is_smooth,
-         scratchworkspace):
     try:
+
+        i = int(oid) - 1
+        raster = 'dem' + str(i)
+        N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
+
+        arcpy.AddMessage('\n> GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N) + '\n')
+
+        if not arcpy.Exists(scratchworkspace + '/source/' + raster):
+            arcpy.AddMessage('\nNOTHING TO GENERALIZE: tile ' + str(i + 1) + ' is empty. Finishing...\n')
+            return True
+
         arcpy.CheckOutExtension("Spatial")
         arcpy.CheckOutExtension("3D")
+
+        dem0 = arcpy.Raster(scratchworkspace + '/source/' + raster)
+        dem = dem0
 
         arcpy.env.overwriteOutput = True
 
@@ -87,20 +101,10 @@ def call(oid,
         arcpy.env.scratchWorkspace = rastertinworkspace
         arcpy.env.workspace = workspace
 
-        i = int(oid)-1
-        raster = 'dem' + str(i)
-
-        N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
-
         cells = arcpy.da.SearchCursor(fishbuffer, ['SHAPE@', 'OID@'])
         cell = cells.next()
         while cell[1] != oid:
             cell = cells.next()
-
-        arcpy.AddMessage('\n> GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N) + '\n')
-
-        dem0 = arcpy.Raster(scratchworkspace + '/source/' + raster)
-        dem = dem0
 
         marine_area = None
         process_marine = False
@@ -116,9 +120,9 @@ def call(oid,
                 nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
 
                 if nareas == 0:
-                    arcpy.AddMessage('NOTHING TO GENERALIZE: The cell is completely in the marine area. Finishing...')
-                    arcpy.AddMessage("CLEANING MAIN DATA")
+                    arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely in the marine area. Finishing...\n')
 
+                    # arcpy.AddMessage("CLEANING MAIN DATA")
                     # arcpy.Delete_management(marine_area)
                     # arcpy.Delete_management(cell_erased)
                     # arcpy.Delete_management(workspace)
@@ -236,10 +240,6 @@ def call(oid,
             arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
             arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
 
-            # pourpts2 = arcpy.CreateFeatureclass_management(workspace, "pourpts2", "POINT", pointslyr, "DISABLED",
-            #                                                "DISABLED",
-            #                                                arcpy.Describe(endpoints2_e).spatialReference)
-
             pourpts2 = workspace + "/pourpts2"
             arcpy.CopyFeatures_management(pointslyr, pourpts2)
 
@@ -293,8 +293,7 @@ def call(oid,
 
             arcpy.ddd.CreateTin(tin, "", featurestring, "")
 
-            arcpy.AddMessage("CLEANING SUPPLEMENTARY DATA")
-
+            # arcpy.AddMessage("CLEANING SUPPLEMENTARY DATA")
             # arcpy.Delete_management(str2_0)
             # arcpy.Delete_management(endpoints1)
             # arcpy.Delete_management(endbuffers1)
@@ -372,7 +371,7 @@ def call(oid,
             arcpy.AddMessage("Saving result...")
             result.save(scratchworkspace + '/gen/dem' + str(i))
 
-        arcpy.AddMessage("CLEANING MAIN DATA")
+        # arcpy.AddMessage("CLEANING MAIN DATA")
 
         # if stream_processing:
         #     arcpy.Delete_management(streams1)
@@ -397,7 +396,7 @@ def call(oid,
         return True
 
     except:
-        arcpy.AddMessage("Failed to generalize tile dem" + str(oid - 1))
+        arcpy.AddMessage("FAILED TO GENERALIZE tile dem" + str(oid - 1))
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
         pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
@@ -405,115 +404,6 @@ def call(oid,
         arcpy.AddError(pymsg)
 
         return False
-
-def createFishnet(workspace, output, nrows, ncols, overlap, template, split = False, overlap2 = None):
-    desc = arcpy.Describe(template)
-
-    xmin = desc.extent.XMin
-    xmax = desc.extent.XMax
-    ymin = desc.extent.YMin
-    ymax = desc.extent.YMax
-
-    Lx = xmax - xmin
-    Ly = ymax - ymin
-
-    wx = (Lx + (ncols - 1) * overlap) / ncols
-    wy = (Ly + (nrows - 1) * overlap) / nrows
-
-    arcpy.CreateFeatureclass_management(workspace, output, "POLYGON", spatial_reference=template)
-
-    xcoords = []
-    ycoords = []
-
-    jdx = range(nrows)
-    idx = range(ncols)
-
-    if split:
-        wx0 = wx - 0.5 * overlap  # width of the first and last cell
-        wx1 = wx - overlap  # width of other cells
-
-        wy0 = wy - 0.5 * overlap  # heoght of the first and last cell
-        wy1 = wy - overlap  # height of other cells
-
-        x = xmin
-        xcoords.append(xmin)
-        for i in range(ncols):
-            if i == 0 or i == ncols - 1:
-                x += wx0
-                xcoords.append(x)
-            else:
-                x += wx1
-                xcoords.append(x)
-
-        y = ymin
-        ycoords.append(ymin)
-        for j in range(nrows):
-            if j == 0 or j == nrows - 1:
-                y += wy0
-                ycoords.append(y)
-            else:
-                y += wy1
-                ycoords.append(y)
-    else:
-        if overlap2 == None:
-            x = xmin
-            for i in range(ncols):
-                xcoords.append(x)
-                x += wx
-                xcoords.append(x)
-                x -= overlap
-
-            y = ymin
-            for j in range(nrows):
-                ycoords.append(y)
-                y += wy
-                ycoords.append(y)
-                y -= overlap
-        else:
-            wx0 = wx - 0.5 * overlap + 0.5 * overlap2
-            wx1 = wx - overlap + overlap2
-            x = xmin
-            for i in range(ncols):
-                xcoords.append(x)
-                if i == 0 or i == ncols - 1:
-                    x += wx0
-                else:
-                    x += wx1
-                xcoords.append(x)
-                x -= overlap2
-
-            wy0 = wy - 0.5 * overlap + 0.5 * overlap2
-            wy1 = wy - overlap + overlap2
-            y = ymin
-            for j in range(nrows):
-                ycoords.append(y)
-                if j == 0 or j == nrows - 1:
-                    y += wy0
-                else:
-                    y += wy1
-                ycoords.append(y)
-                y -= overlap2
-
-        jdx = range(0, 2 * nrows, 2)
-        idx = range(0, 2 * ncols, 2)
-
-    fishnet = workspace + '/' + output
-
-    cursor = arcpy.da.InsertCursor(fishnet, ["SHAPE@"])
-
-    for j in jdx:
-        for i in idx:
-            points = [arcpy.Point(xcoords[i], ycoords[j]),
-                      arcpy.Point(xcoords[i + 1], ycoords[j]),
-                      arcpy.Point(xcoords[i + 1], ycoords[j + 1]),
-                      arcpy.Point(xcoords[i], ycoords[j + 1])]
-            array = arcpy.Array(points)
-            polygon = arcpy.Polygon(array)
-            cursor.insertRow([polygon])
-
-    del cursor
-
-    return
 
 def execute(demdataset,
             marine,
@@ -528,8 +418,9 @@ def execute(demdataset,
             widendist,
             filtersize,
             is_smooth,
-            is_parallel,
-            tilesize):
+            tile_size,
+            num_processes,
+            is_parallel):
 
     try:
         arcpy.CheckOutExtension("3D")
@@ -572,8 +463,8 @@ def execute(demdataset,
 
         demsource = arcpy.Raster(demdataset)
 
-        nrows = int(math.ceil(float(demsource.height) / float(tilesize)))
-        ncols = int(math.ceil(float(demsource.width) / float(tilesize)))
+        nrows = int(math.ceil(float(demsource.height) / float(tile_size)))
+        ncols = int(math.ceil(float(demsource.width) / float(tile_size)))
         total = nrows * ncols
 
         cellsize = 0.5 * (demsource.meanCellHeight + demsource.meanCellWidth)
@@ -587,26 +478,16 @@ def execute(demdataset,
 
         arcpy.AddMessage('Creating fishnet...')
         fishnet = workspace + "/fishnet"
-        createFishnet(workspace, 'fishnet', nrows, ncols, overlap, demdataset, split=True)
-        # arcpy.CreateFishnet_management(fishnet,
-        #                                str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin),
-        #                                str(demsource.extent.XMin) + ' ' + str(demsource.extent.YMin + 1),
-        #                                '', '',
-        #                                nrows, ncols,
-        #                                '', '',
-        #                                demsource.extent, 'POLYGON')
-        #
+        CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap, split=True)
 
         arcpy.AddMessage('Creating split buffer...')
         fishbuffer = workspace + "/fishbuffer"
-        createFishnet(workspace, 'fishbuffer', nrows, ncols, overlap, demdataset, split=False)
-        # arcpy.Buffer_analysis(fishnet, fishbuffer, bufferwidth)
+        CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap, split=False)
 
         arcpy.AddMessage('Creating mask buffer...')
         mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
         fishmaskbuffer = workspace + "/fishmaskbuffer"
-        createFishnet(workspace, 'fishmaskbuffer', nrows, ncols, overlap, demdataset, split=False, overlap2 = mask_overlap)
-        # arcpy.Buffer_analysis(fishnet, fishmaskbuffer, max(demsource.meanCellHeight, demsource.meanCellWidth))
+        CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap, split=False, overlap2=mask_overlap)
 
 
         arcpy.AddMessage('Splitting raster...')
@@ -617,13 +498,6 @@ def execute(demdataset,
                                      format='GRID',
                                      num_rasters = str(ncols) + ' ' + str(nrows),
                                      overlap=2*bufferpixelwidth)
-        # arcpy.SplitRaster_management(demdataset,
-        #                              scratchworkspace + "/source",
-        #                              'dem',
-        #                              'POLYGON_FEATURES',
-        #                              'GRID',
-        #                              overlap=2*bufferpixelwidth,
-        #                              split_polygon_feature_class=fishnet)
 
         rows = arcpy.da.SearchCursor(fishnet, 'OID@')
         oids = [row[0] for row in rows]
@@ -636,6 +510,15 @@ def execute(demdataset,
 
         if is_parallel == 'true':
             nproc = multiprocessing.cpu_count()
+
+            if 0 < num_processes < 1:
+                nproc = int(math.ceil(nproc * num_processes))
+            elif num_processes < 0:
+                nproc = int(math.floor(nproc - num_processes))
+                if nproc < 1:
+                    nproc = 1
+            elif num_processes >= 1:
+                nproc = math.ceil(num_processes)
 
             arcpy.AddMessage('> Trying to make multiprocessing using ' + str(nproc) + ' processor cores')
             arcpy.AddMessage('')
@@ -656,94 +539,24 @@ def execute(demdataset,
                              repeat(is_smooth),
                              repeat(scratchworkspace))
 
-            pool.map(call_list, args)
+            results = pool.map(call, args)
 
             pool.close()
             pool.join()
 
-            # i = 0 # number of processes in current pool
-            # k = 0 # total number of processes
-            # for oid in oids:
-            #     jobs.append(pool.apply_async(call, (oid,
-            #                             demdataset,
-            #                             marine,
-            #                             fishbuffer,
-            #                             minacc1,
-            #                             minlen1,
-            #                             minacc2,
-            #                             minlen2,
-            #                             is_widen,
-            #                             widentype,
-            #                             widendist,
-            #                             filtersize,
-            #                             is_smooth,
-            #                             scratchworkspace,)))
-            #     i+=1
-            #     k+=1
-            #     if i == nproc:
-            #         pool.close()
-            #         pool.join()
-            #
-            #         if k < len(oids):
-            #             arcpy.AddMessage('\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
-            #             pool = multiprocessing.Pool(nproc)
-            #
-            #         i = 0
-            # if i > 0:
-            #     pool.close()
-            #     pool.join()
-            #
-            # falseoids = []
-            # for state, oid in zip(jobs, oids):
-            #     if state.get() == False:
-            #         falseoids.append(oid)
-            #
-            # if len(falseoids) > 0:
-            #     arcpy.AddMessage('\n> FAILED to generalize tiles with OID = ' + str(falseoids) + '\n')
-            #     answer = raw_input("\n> Press 'y' if you want to try them to generalize once more time...\n")
-            #     if answer in ('y', 'Y'):
-            #         jobs = []
-            #         pool = multiprocessing.Pool(nproc)
-            #         i = 0
-            #         k = 0
-            #         for falseoid in falseoids:
-            #             jobs.append(pool.apply_async(call, (falseoid,
-            #                                                 demdataset,
-            #                                                 marine,
-            #                                                 fishbuffer,
-            #                                                 minacc1,
-            #                                                 minlen1,
-            #                                                 minacc2,
-            #                                                 minlen2,
-            #                                                 is_widen,
-            #                                                 widentype,
-            #                                                 widendist,
-            #                                                 filtersize,
-            #                                                 is_smooth,
-            #                                                 scratchworkspace,)))
-            #             i += 1
-            #             k += 1
-            #             if i == nproc:
-            #                 pool.close()
-            #                 pool.join()
-            #
-            #                 if k < len(falseoids):
-            #                     arcpy.AddMessage(
-            #                         '\n> Trying to make multiprocessing using ' + str(nproc) + ' processor cores\n')
-            #                     arcpy.AddMessage('')
-            #                     pool = multiprocessing.Pool(nproc)
-            #
-            #                 i = 0
-            #
-            #         if i > 0:
-            #             pool.close()
-            #             pool.join()
+            falseoids = []
+            for state, oid in zip(results, oids):
+                if state == False:
+                    falseoids.append(oid)
+
+            if len(falseoids) > 0:
+                arcpy.AddMessage('\n> FAILED to generalize tiles with OID = ' + str(falseoids) + '\n')
 
         else:
             arcpy.AddMessage('> Processing in sequential mode')
             arcpy.AddMessage('')
             for oid in oids:
-                jobs.append(call(oid,
+                jobs.append(call((oid,
                              demdataset,
                              marine,
                              fishbuffer,
@@ -756,31 +569,13 @@ def execute(demdataset,
                              widendist,
                              filtersize,
                              is_smooth,
-                             scratchworkspace))
+                             scratchworkspace)))
             falseoids = []
             for state, oid in zip(jobs, oids):
                 if state == False:
                     falseoids.append(str(oid))
 
             arcpy.AddMessage('Failed to generalize tiles with OID = ' + str(falseoids))
-            answer = raw_input("\n> Press 'y' if you want to try them to generalize once more time...\n")
-            if answer in ('y', 'Y'):
-                jobs = []
-                for falseoid in falseoids:
-                    jobs.append(call(falseoid,
-                                 demdataset,
-                                 marine,
-                                 fishbuffer,
-                                 minacc1,
-                                 minlen1,
-                                 minacc2,
-                                 minlen2,
-                                 is_widen,
-                                 widentype,
-                                 widendist,
-                                 filtersize,
-                                 is_smooth,
-                                 scratchworkspace))
 
         # FINALIZE
 
@@ -792,8 +587,11 @@ def execute(demdataset,
             raster = scratchworkspace + '/gen/dem' + str(i)
             if arcpy.Exists(raster):
                 dem = arcpy.Raster(raster)
-                dem_clipped = ExtractByMask(dem, row[0])
-                dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
+                try:
+                    dem_clipped = ExtractByMask(dem, row[0])
+                    dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
+                except:
+                    arcpy.AddMessage('NOTHING TO EXTRACT: Tile ' + str(i) + ' has significant values only outside its frame')
             i += 1
 
         arcpy.env.workspace = scratchworkspace + '/gencrop'
