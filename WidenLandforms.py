@@ -90,9 +90,3 @@ if __name__ == "__main__":
         pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
                 str(sys.exc_type)+ ": " + str(sys.exc_value) + "\n"
         arcpy.AddError(pymsg)
-
-
-
-
-
-
