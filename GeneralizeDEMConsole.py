@@ -8,10 +8,10 @@ if __name__ == '__main__':
 
     # SET PARAMETERS HERE
     # --------------------------------------------------------------------
-    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/magadan'
+    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/america_gen10_test.tif'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/magadan_gen'
-    outputcellsize = 1000
+    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/america_gen10_exp'
+    outputcellsize = 2000
     minacc1 = 40
     minlen1 = 10
     minacc2 = 20
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 512
+    tilesize = 1024
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')
@@ -33,7 +33,7 @@ if __name__ == '__main__':
         GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
                               minacc1, minlen1, minacc2, minlen2,
                               is_widen, widentype, widendist, filtersize,
-                              is_smooth, is_parallel, tilesize)
+                              is_smooth, tilesize, 0, is_parallel)
     except Exception:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
