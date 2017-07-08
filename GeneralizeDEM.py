@@ -15,40 +15,6 @@ from itertools import repeat
 import os.path, ExtractStreams, WidenLandforms, CreateFishnet
 __author__ = 'Timofey Samsonov'
 
-# def tin_to_raster(tin, rastertin, rastertype, method, cellsize, factor):
-#     arcpy.TinRaster_3d(tin, rastertin, rastertype, method, cellsize, factor)
-#     return
-
-# def call_list((oid,
-#          demdataset,
-#          marine,
-#          fishbuffer,
-#          minacc1,
-#          minlen1,
-#          minacc2,
-#          minlen2,
-#          is_widen,
-#          widentype,
-#          widendist,
-#          filtersize,
-#          is_smooth,
-#          scratchworkspace)):
-#
-#     return call(oid,
-#          demdataset,
-#          marine,
-#          fishbuffer,
-#          minacc1,
-#          minlen1,
-#          minacc2,
-#          minlen2,
-#          is_widen,
-#          widentype,
-#          widendist,
-#          filtersize,
-#          is_smooth,
-#          scratchworkspace)
-
 def call((oid,
          demdataset,
          marine,
