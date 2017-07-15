@@ -8,9 +8,9 @@ if __name__ == '__main__':
 
     # SET PARAMETERS HERE
     # --------------------------------------------------------------------
-    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/america_gen10_test.tif'
+    demdataset = 'X:/Work/DEMGEN/chukotka_Clip'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/america_gen10_exp'
+    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/chukotka_gen'
     outputcellsize = 2000
     minacc1 = 40
     minlen1 = 10
@@ -22,7 +22,7 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 1024
+    tilesize = 1100
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')

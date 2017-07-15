@@ -7,9 +7,13 @@ def execute(template, output, nrows, ncols, overlap, split = False, overlap2 = 0
 
     desc = arcpy.Describe(template)
 
+    adjustment = 0
+    # if desc.dataType == "RasterLayer" or desc.dataType == "RasterDataset":
+    #     adjustment = desc.meanCellWidth
+
     xmin = desc.extent.XMin
-    xmax = desc.extent.XMax
-    ymin = desc.extent.YMin
+    xmax = desc.extent.XMax - adjustment
+    ymin = desc.extent.YMin + adjustment
     ymax = desc.extent.YMax
 
     Lx = xmax - xmin

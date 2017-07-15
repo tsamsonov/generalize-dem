@@ -49,6 +49,9 @@ def call((oid,
 
         arcpy.env.overwriteOutput = True
 
+        arcpy.env.extent = dem0.extent # Very important!
+        arcpy.env.snapRaster = dem0 # Very important!
+
         processing_folder = scratchworkspace + '/processing'
         tile_folder = 'dem' + str(oid)
 
@@ -457,6 +460,8 @@ def execute(demdataset,
 
 
         arcpy.AddMessage('Splitting raster...')
+        arcpy.env.extent = demsource.extent # Very important!
+        arcpy.env.snapRaster = demsource # Very important!
         arcpy.SplitRaster_management(demdataset,
                                      scratchworkspace + "/source",
                                      'dem',
@@ -546,6 +551,7 @@ def execute(demdataset,
         # FINALIZE
 
         arcpy.AddMessage("CLIPPING AND MASKING GENERALIZED RASTERS")
+        arcpy.env.snapRaster = demsource
 
         rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
         i = 0
