@@ -3,7 +3,7 @@ import sys
 import arcpy
 import traceback
 
-def execute(template, output, nrows, ncols, overlap, split = False, overlap2 = 0):
+def execute(template, output, nrows, ncols, overlap = 0, split = False, overlap2 = 0):
 
     desc = arcpy.Describe(template)
 
