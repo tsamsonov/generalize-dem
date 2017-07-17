@@ -8,9 +8,9 @@ if __name__ == '__main__':
 
     # SET PARAMETERS HERE
     # --------------------------------------------------------------------
-    demdataset = 'X:/Work/DEMGEN/chukotka_Clip'
+    demdataset = 'X:/Work/DEMGEN/bering_mask'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/chukotka_gen'
+    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/bering_gen'
     outputcellsize = 2000
     minacc1 = 40
     minlen1 = 10

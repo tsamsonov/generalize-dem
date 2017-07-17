@@ -178,7 +178,49 @@ def call((oid,
 
             arcpy.AddMessage("Vectorizing primary watersheds...")
             watersheds1 = workspace + "/watersheds1"
-            arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
+            try:
+                arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
+            except:
+                arcpy.AddMessage("\n> FAILED TO CONVERT PRIMARY WATERSHEDS TO VECTOR - PROBABLY EXTENT ERROR. MASKING...\n")
+
+                domain = workspace + "/domain1"
+
+                arcpy.RasterDomain_3d(wsh1, domain, "POLYGON")
+
+                envpoly = workspace + "/envpoly1"
+                arcpy.MinimumBoundingGeometry_management(domain, envpoly,
+                                                         "ENVELOPE", "NONE")
+
+                envline = workspace + "/envline1"
+                arcpy.PolygonToLine_management(envpoly, envline)
+
+                envpolyr = workspace + "/envpolyr1"
+                envliner = workspace + "/envliner1"
+
+                arcpy.PolygonToRaster_conversion(envpoly, "OBJECTID",
+                                                 envpolyr, "", "", cellsize)
+
+                arcpy.PolylineToRaster_conversion(envline, "OBJECTID",
+                                                 envliner, "", "", cellsize)
+
+                envmaskname = "envmask1"
+                envmask = workspace + "/" + envmaskname
+
+                envs = [envpolyr, envliner]
+
+                arcpy.MosaicToNewRaster_management(envs,
+                                                   workspace,
+                                                   envmaskname,
+                                                   "",
+                                                   "8_BIT_UNSIGNED",
+                                                   str(cellsize),
+                                                   "1",
+                                                   "SUM",
+                                                   "FIRST")
+
+                wsh1_m = SetNull(envmask, wsh1, "VALUE = 2")
+
+                arcpy.RasterToPolygon_conversion(wsh1_m, watersheds1, True, "")
 
             # SECONDARY STREAMS AND WATERSHEDS
 
@@ -226,7 +268,48 @@ def call((oid,
 
             arcpy.AddMessage("Vectorizing secondary watersheds...")
             watersheds2 = workspace + "/watersheds2"
-            arcpy.RasterToPolygon_conversion(wsh2, watersheds2, True, "")
+
+            try:
+                arcpy.RasterToPolygon_conversion(wsh2, watersheds2, True, "")
+            except:
+                arcpy.AddMessage("\n> FAILED TO CONVERT SECONDARY WATERSHEDS TO VECTOR - PROBABLY EXTENT ERROR. MASKING...\n")
+                domain = workspace + "/domain2"
+
+                arcpy.RasterDomain_3d(wsh2, domain, "POLYGON")
+
+                envpoly = workspace + "/envpoly2"
+                arcpy.MinimumBoundingGeometry_management(domain, envpoly,
+                                                         "ENVELOPE", "NONE")
+                envline = workspace + "/envline2"
+                arcpy.PolygonToLine_management(envpoly, envline)
+
+                envpolyr = workspace + "/envpolyr2"
+                envliner = workspace + "/envliner2"
+
+                arcpy.PolygonToRaster_conversion(envpoly, "OBJECTID",
+                                                 envpolyr, "", "", cellsize)
+
+                arcpy.PolylineToRaster_conversion(envline, "OBJECTID",
+                                                  envliner, "", "", cellsize)
+
+                envmaskname = "envmask2"
+                envmask = workspace + "/" + envmaskname
+
+                envs = [envpolyr, envliner]
+
+                arcpy.MosaicToNewRaster_management(envs,
+                                                   workspace,
+                                                   envmaskname,
+                                                   "",
+                                                   "8_BIT_UNSIGNED",
+                                                   str(cellsize),
+                                                   "1",
+                                                   "SUM",
+                                                   "FIRST")
+
+                wsh2_m = SetNull(envmask, wsh2, "VALUE = 2")
+
+                arcpy.RasterToPolygon_conversion(wsh2_m, watersheds2, True, "")
 
             arcpy.AddMessage("Interpolating features into 3D...")
 
