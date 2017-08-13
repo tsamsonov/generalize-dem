@@ -500,8 +500,26 @@ class GeneralizeDEM(object):
         num_processes.category = '4. Tiling and parallel processing'
         num_processes.value = 0
 
+        is_continued = arcpy.Parameter(
+            displayName="Continue previous processing",
+            name="is_continued",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+        is_continued.category = '5. Continue previous processing'
+        is_continued.value = 'false'
+
+        continued_folder = arcpy.Parameter(
+            displayName="Scratch folder from previous processing",
+            name="continued_folder",
+            datatype="DEFolder",
+            parameterType="Optional",
+            direction="Input")
+        continued_folder.category = '5. Continue previous processing'
+
         params = [demdataset, marine, output, outputcellsize, minacc1, minlen1, minacc2, minlen2,
-                  is_widen, widentype, widendist, filtersize, is_smooth, is_tiled, tile_size, is_parallel, num_processes]
+                  is_widen, widentype, widendist, filtersize, is_smooth, is_tiled, tile_size,
+                  is_parallel, num_processes, is_continued, continued_folder]
         return params
 
     def isLicensed(self):
@@ -536,6 +554,8 @@ class GeneralizeDEM(object):
         tile_size = int(parameters[14].valueAsText)
         is_parallel = parameters[15].valueAsText
         num_processes = float(parameters[16].valueAsText)
+        continued = True if parameters[17].valueAsText == 'true' else False
+        continued_folder = parameters[18].valueAsText
 
         GD.execute(demdataset,
                   marine,
@@ -552,6 +572,8 @@ class GeneralizeDEM(object):
                   is_smooth,
                   tile_size,
                   num_processes,
-                  is_parallel)
+                  is_parallel,
+                  continued,
+                  continued_folder)
 
         return

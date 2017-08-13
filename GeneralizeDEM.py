@@ -714,8 +714,10 @@ if __name__ == '__main__':
     is_smooth = arcpy.GetParameterAsText(12)
     is_parallel = arcpy.GetParameterAsText(13)
     tilesize = int(arcpy.GetParameterAsText(14))
+    continued = True if arcpy.GetParameterAsText(15) == 'true' else False
+    continued_folder = arcpy.GetParameterAsText(16)
 
     execute(demdataset, marine, output, outputcellsize,
             minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
-            is_smooth, is_parallel, tilesize)
+            is_smooth, is_parallel, tilesize, continued, continued_folder)

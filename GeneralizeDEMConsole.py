@@ -23,6 +23,8 @@ if __name__ == '__main__':
     is_smooth = 'true'
     is_parallel = 'true'
     tilesize = 1100
+    continued = False
+    continued_folder = 'X:/Work/DEMGEN/Scratch/'
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')
@@ -33,7 +35,7 @@ if __name__ == '__main__':
         GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
                               minacc1, minlen1, minacc2, minlen2,
                               is_widen, widentype, widendist, filtersize,
-                              is_smooth, tilesize, 0, is_parallel)
+                              is_smooth, tilesize, 0, is_parallel, continued, continued_folder)
     except Exception:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
