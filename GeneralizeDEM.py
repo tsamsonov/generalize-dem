@@ -472,7 +472,9 @@ def execute(demdataset,
             is_smooth,
             tile_size,
             num_processes,
-            is_parallel):
+            is_parallel,
+            continued=False,
+            continued_folder=None):
 
     try:
         arcpy.CheckOutExtension("3D")
@@ -482,36 +484,41 @@ def execute(demdataset,
 
         # ORGANIZE WORKSPACE
 
+
         workspace = os.path.dirname(output)
         scratchworkspace = workspace
-        n = len(scratchworkspace)
-        if n > 4:
-            end = scratchworkspace[n - 4: n]  # extract last 4 letters
-            if end == ".gdb":  # geodatabase
-                scratchworkspace = os.path.dirname(scratchworkspace)
 
-        arcpy.env.workspace = scratchworkspace
-        workspaces = arcpy.ListWorkspaces("*", "Folder")
-        names = [os.path.basename(w) for w in workspaces]
-        i = 0
-        name = 'scratch'
-        while name in names:
-            name = 'scratch' + str(i)
-            i += 1
-        arcpy.CreateFolder_management(scratchworkspace, name)
+        if(continued):
+            scratchworkspace = continued_folder
+            arcpy.AddMessage('\n> CONTINUING PREVIOUS PROCESSING\n')
+        else:
+            n = len(scratchworkspace)
+            if n > 4:
+                end = scratchworkspace[n - 4: n]  # extract last 4 letters
+                if end == ".gdb":  # geodatabase
+                    scratchworkspace = os.path.dirname(scratchworkspace)
 
-        scratchworkspace += '/' + name
-        arcpy.env.workspace = scratchworkspace
+            arcpy.env.workspace = scratchworkspace
+            workspaces = arcpy.ListWorkspaces("*", "Folder")
+            names = [os.path.basename(w) for w in workspaces]
+            i = 0
+            name = 'scratch'
+            while name in names:
+                name = 'scratch' + str(i)
+                i += 1
+            arcpy.CreateFolder_management(scratchworkspace, name)
 
-        arcpy.CreateFolder_management(scratchworkspace, 'gen') # generalized tiles
-        arcpy.CreateFolder_management(scratchworkspace, 'gencrop') # generalized and cropped tiles
-        arcpy.CreateFolder_management(scratchworkspace, 'processing') # main processing workspace
-        arcpy.CreateFolder_management(scratchworkspace, 'source') # source tiles
-        arcpy.CreateFileGDB_management(scratchworkspace, 'Scratch.gdb')
+            scratchworkspace += '/' + name
+            arcpy.env.workspace = scratchworkspace
+
+            arcpy.CreateFolder_management(scratchworkspace, 'gen') # generalized tiles
+            arcpy.CreateFolder_management(scratchworkspace, 'gencrop') # generalized and cropped tiles
+            arcpy.CreateFolder_management(scratchworkspace, 'processing') # main processing workspace
+            arcpy.CreateFolder_management(scratchworkspace, 'source') # source tiles
+            arcpy.CreateFileGDB_management(scratchworkspace, 'Scratch.gdb')
+
+
         workspace = scratchworkspace + "/Scratch.gdb"
-
-
-        # SPLIT THE TASK INTO TILES
 
         demsource = arcpy.Raster(demdataset)
 
@@ -525,38 +532,52 @@ def execute(demdataset,
         bufferwidth = bufferpixelwidth * cellsize
         overlap = bufferwidth * 2
 
-        arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
-        arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
-
-        arcpy.AddMessage('Creating fishnet...')
         fishnet = workspace + "/fishnet"
-        CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap, split=True)
-
-        arcpy.AddMessage('Creating split buffer...')
         fishbuffer = workspace + "/fishbuffer"
-        CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap, split=False)
-
-        arcpy.AddMessage('Creating mask buffer...')
-        mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
         fishmaskbuffer = workspace + "/fishmaskbuffer"
-        CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap, split=False, overlap2=mask_overlap)
 
+        if(not continued):
+            # SPLIT THE TASK INTO TILES
 
-        arcpy.AddMessage('Splitting raster...')
-        arcpy.env.extent = demsource.extent # Very important!
-        arcpy.env.snapRaster = demsource # Very important!
-        arcpy.SplitRaster_management(demdataset,
-                                     scratchworkspace + "/source",
-                                     'dem',
-                                     split_method='NUMBER_OF_TILES',
-                                     format='GRID',
-                                     num_rasters = str(ncols) + ' ' + str(nrows),
-                                     overlap=2*bufferpixelwidth)
+            arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
+            arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
+
+            arcpy.AddMessage('Creating fishnet...')
+
+            CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap, split=True)
+
+            arcpy.AddMessage('Creating split buffer...')
+
+            CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap, split=False)
+
+            arcpy.AddMessage('Creating mask buffer...')
+            mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
+
+            CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap, split=False, overlap2=mask_overlap)
+
+            arcpy.AddMessage('Splitting raster...')
+            arcpy.env.extent = demsource.extent # Very important!
+            arcpy.env.snapRaster = demsource # Very important!
+            arcpy.SplitRaster_management(demdataset,
+                                         scratchworkspace + "/source",
+                                         'dem',
+                                         split_method='NUMBER_OF_TILES',
+                                         format='GRID',
+                                         num_rasters = str(ncols) + ' ' + str(nrows),
+                                         overlap=2*bufferpixelwidth)
 
         rows = arcpy.da.SearchCursor(fishnet, 'OID@')
         oids = [row[0] for row in rows]
 
-        arcpy.AddMessage('')
+        if (continued):
+            arcpy.env.workspace = scratchworkspace + '/gen'
+            rasters = arcpy.ListRasters("*", "GRID")
+
+            oids_done = [raster[4:] for raster in rasters]
+
+            oids = list(set(oids).symmetric_difference(oids_done))
+
+            arcpy.AddMessage('\n> Already processed oids = ' + str(oids_done) + '\n')
 
         # PERFORM PROCESSING
 

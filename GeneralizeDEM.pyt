@@ -538,20 +538,20 @@ class GeneralizeDEM(object):
         num_processes = float(parameters[16].valueAsText)
 
         GD.execute(demdataset,
-                              marine,
-                              output,
-                              outputcellsize,
-                              minacc1,
-                              minlen1,
-                              minacc2,
-                              minlen2,
-                              is_widen,
-                              widentype,
-                              widendist,
-                              filtersize,
-                              is_smooth,
-                              tile_size,
-                              num_processes,
-                              is_parallel)
+                  marine,
+                  output,
+                  outputcellsize,
+                  minacc1,
+                  minlen1,
+                  minacc2,
+                  minlen2,
+                  is_widen,
+                  widentype,
+                  widendist,
+                  filtersize,
+                  is_smooth,
+                  tile_size,
+                  num_processes,
+                  is_parallel)
 
         return
