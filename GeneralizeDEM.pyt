@@ -107,7 +107,6 @@ class CreateFishnet(object):
         overlap2 = float(parameters[5].valueAsText)
         split = parameters[6].valueAsText
 
-
         CF.execute(template, output, nrows, ncols, overlap, split, overlap2)
 
         return

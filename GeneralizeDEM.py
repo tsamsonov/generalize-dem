@@ -30,7 +30,6 @@ def call((oid,
          is_smooth,
          scratchworkspace)):
     try:
-
         i = int(oid) - 1
         raster = 'dem' + str(i)
         N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
@@ -712,12 +711,15 @@ if __name__ == '__main__':
     widendist = float(arcpy.GetParameterAsText(10))
     filtersize = int(arcpy.GetParameterAsText(11))
     is_smooth = arcpy.GetParameterAsText(12)
-    is_parallel = arcpy.GetParameterAsText(13)
-    tilesize = int(arcpy.GetParameterAsText(14))
-    continued = True if arcpy.GetParameterAsText(15) == 'true' else False
-    continued_folder = arcpy.GetParameterAsText(16)
+    is_tiled = arcpy.GetParameterAsText(13)
+    tile_size = arcpy.GetParameterAsText(14)
+    is_parallel = arcpy.GetParameterAsText(15)
+    num_processes = int(arcpy.GetParameterAsText(16))
+    continued = True if arcpy.GetParameterAsText(17) == 'true' else False
+    continued_folder = arcpy.GetParameterAsText(18)
 
     execute(demdataset, marine, output, outputcellsize,
             minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
-            is_smooth, is_parallel, tilesize, continued, continued_folder)
+            is_smooth, tile_size, num_processes, is_parallel,
+            continued, continued_folder)
