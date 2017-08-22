@@ -15,7 +15,11 @@ from itertools import repeat
 import os.path, ExtractStreams, WidenLandforms, CreateFishnet
 __author__ = 'Timofey Samsonov'
 
-def call((oid,
+# Just a crutch for pool.map (Python 2.7)
+def call_list(args):
+    return call(*args)
+
+def call(oid,
          demdataset,
          marine,
          fishbuffer,
@@ -28,7 +32,7 @@ def call((oid,
          widendist,
          filtersize,
          is_smooth,
-         scratchworkspace)):
+         scratchworkspace):
     try:
         i = int(oid) - 1
         raster = 'dem' + str(i)
@@ -81,25 +85,28 @@ def call((oid,
             arcpy.AddMessage("Extracting marine area...")
             marine_area = workspace + "/land" + str(i)
             arcpy.Clip_analysis(marine, cell[0], marine_area)
-            if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
-                cell_erased = workspace + "/cell_erased" + str(i)
-                arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
+            if arcpy.Exists(marine_area):
+                if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
+                    cell_erased = workspace + "/cell_erased" + str(i)
+                    arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
 
-                nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
+                    nareas = 0
+                    if arcpy.Exists(cell_erased):
+                        nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
 
-                if nareas == 0:
-                    arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely in the marine area. Finishing...\n')
+                    if nareas == 0:
+                        arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely in the marine area. Finishing...\n')
 
-                    # arcpy.AddMessage("CLEANING MAIN DATA")
-                    # arcpy.Delete_management(marine_area)
-                    # arcpy.Delete_management(cell_erased)
-                    # arcpy.Delete_management(workspace)
-                    # arcpy.Delete_management(rastertinworkspace)
+                        # arcpy.AddMessage("CLEANING MAIN DATA")
+                        # arcpy.Delete_management(marine_area)
+                        # arcpy.Delete_management(cell_erased)
+                        # arcpy.Delete_management(workspace)
+                        # arcpy.Delete_management(rastertinworkspace)
 
-                    arcpy.CheckInExtension("3D")
-                    arcpy.CheckInExtension("Spatial")
+                        arcpy.CheckInExtension("3D")
+                        arcpy.CheckInExtension("Spatial")
 
-                    return True
+                        return True
                 else:
                     dem = ExtractByMask(dem0, cell_erased)
                     dem.save(rastertinworkspace + '/' + raster + "_e")
@@ -489,7 +496,7 @@ def execute(demdataset,
 
         if(continued):
             scratchworkspace = continued_folder
-            arcpy.AddMessage('\n> CONTINUING PREVIOUS PROCESSING\n')
+            arcpy.AddMessage('\n> CONTINUING PREVIOUS PROCESSING')
         else:
             n = len(scratchworkspace)
             if n > 4:
@@ -566,17 +573,19 @@ def execute(demdataset,
                                          overlap=2*bufferpixelwidth)
 
         rows = arcpy.da.SearchCursor(fishnet, 'OID@')
-        oids = [row[0] for row in rows]
+        oids = [int(row[0]) for row in rows]
 
         if (continued):
             arcpy.env.workspace = scratchworkspace + '/gen'
             rasters = arcpy.ListRasters("*", "GRID")
 
-            oids_done = [raster[4:] for raster in rasters]
+            oids_done = [int(raster[3:])+1 for raster in rasters]
 
             oids = list(set(oids).symmetric_difference(oids_done))
 
-            arcpy.AddMessage('\n> Already processed oids = ' + str(oids_done) + '\n')
+            arcpy.AddMessage('> Already processed oids = ' + str(oids_done))
+
+            arcpy.AddMessage('> Prccessing oids = ' + str(oids))
 
         # PERFORM PROCESSING
 
@@ -613,7 +622,7 @@ def execute(demdataset,
                              repeat(is_smooth),
                              repeat(scratchworkspace))
 
-            results = pool.map(call, args)
+            results = pool.map(call_list, args)
 
             pool.close()
             pool.join()
@@ -630,7 +639,7 @@ def execute(demdataset,
             arcpy.AddMessage('> Processing in sequential mode')
             arcpy.AddMessage('')
             for oid in oids:
-                jobs.append(call((oid,
+                jobs.append(call(oid,
                              demdataset,
                              marine,
                              fishbuffer,
@@ -643,7 +652,7 @@ def execute(demdataset,
                              widendist,
                              filtersize,
                              is_smooth,
-                             scratchworkspace)))
+                             scratchworkspace))
             falseoids = []
             for state, oid in zip(jobs, oids):
                 if state == False:

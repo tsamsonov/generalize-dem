@@ -8,9 +8,9 @@ if __name__ == '__main__':
 
     # SET PARAMETERS HERE
     # --------------------------------------------------------------------
-    demdataset = 'X:/Work/DEMGEN/bering_mask'
+    demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/mistral'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/bering_gen'
+    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/mistral_gen'
     outputcellsize = 2000
     minacc1 = 40
     minlen1 = 10
@@ -22,9 +22,9 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
-    tilesize = 1100
-    continued = False
-    continued_folder = 'X:/Work/DEMGEN/Scratch/'
+    tilesize = 256
+    continued = True
+    continued_folder = 'X:/Work/DEMGEN/scratch1'
     # --------------------------------------------------------------------
 
     print('> Initializing GeneralizeDEM script...')
@@ -32,10 +32,15 @@ if __name__ == '__main__':
 
     start = int(time.time())
     try:
-        GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
-                              minacc1, minlen1, minacc2, minlen2,
-                              is_widen, widentype, widendist, filtersize,
-                              is_smooth, tilesize, 0, is_parallel, continued, continued_folder)
+
+        if arcpy.CheckProduct("ArcInfo") == "Available":
+            GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
+                                  minacc1, minlen1, minacc2, minlen2,
+                                  is_widen, widentype, widendist, filtersize,
+                                  is_smooth, tilesize, 0, is_parallel, continued, continued_folder)
+        else:
+            msg = 'ArcGIS for Desktop Advanced license not available'
+            arcpy.AddError(msg)
     except Exception:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
@@ -49,8 +54,8 @@ if __name__ == '__main__':
     m, s = divmod(seconds, 60)
     h, m = divmod(m, 60)
 
-    print ''
-    print "> Finished in %02d h %02d m %02d s" % (h, m, s)
-    print ''
+    print('')
+    print("> Finished in %02d h %02d m %02d s" % (h, m, s))
+    print('')
 
     input("Press Enter to continue...")
