@@ -550,16 +550,19 @@ def execute(demdataset,
 
             arcpy.AddMessage('Creating fishnet...')
 
-            CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap, split=True)
+            CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap,
+                                  split=True, shrink=cellsize)
 
             arcpy.AddMessage('Creating split buffer...')
 
-            CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap, split=False)
+            CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap,
+                                  split=False, shrink=cellsize)
 
             arcpy.AddMessage('Creating mask buffer...')
             mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
 
-            CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap, split=False, overlap2=mask_overlap)
+            CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap,
+                                  split=False, overlap2=mask_overlap, shrink=cellsize)
 
             arcpy.AddMessage('Splitting raster...')
             arcpy.env.extent = demsource.extent # Very important!

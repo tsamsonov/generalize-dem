@@ -3,18 +3,14 @@ import sys
 import arcpy
 import traceback
 
-def execute(template, output, nrows, ncols, overlap = 0, split = False, overlap2 = 0):
+def execute(template, output, nrows, ncols, overlap = 0, split = False, overlap2 = 0, shrink = 0):
 
     desc = arcpy.Describe(template)
 
-    adjustment = 0
-    # if desc.dataType == "RasterLayer" or desc.dataType == "RasterDataset":
-    #     adjustment = desc.meanCellWidth
-
-    xmin = desc.extent.XMin
-    xmax = desc.extent.XMax - adjustment
-    ymin = desc.extent.YMin + adjustment
-    ymax = desc.extent.YMax
+    xmin = desc.extent.XMin + shrink
+    xmax = desc.extent.XMax - shrink
+    ymin = desc.extent.YMin + shrink
+    ymax = desc.extent.YMax - shrink
 
     Lx = xmax - xmin
     Ly = ymax - ymin
