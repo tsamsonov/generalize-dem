@@ -107,14 +107,14 @@ def call(oid,
                         arcpy.CheckInExtension("Spatial")
 
                         return True
-                else:
-                    dem = ExtractByMask(dem0, cell_erased)
-                    dem.save(rastertinworkspace + '/' + raster + "_e")
-                    dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
+                    else:
+                        dem = ExtractByMask(dem0, cell_erased)
+                        dem.save(rastertinworkspace + '/' + raster + "_e")
+                        dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
 
-                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only=True)
+                        arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only=True)
 
-                    process_marine = True
+                        process_marine = True
 
         cellsize = dem.meanCellHeight
 

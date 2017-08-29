@@ -22,8 +22,9 @@ if __name__ == '__main__':
     filtersize = 5
     is_smooth = 'true'
     is_parallel = 'true'
+    num_processes = 6
     tilesize = 256
-    continued = True
+    continued = False
     continued_folder = 'X:/Work/DEMGEN/scratch1'
     # --------------------------------------------------------------------
 
@@ -37,7 +38,7 @@ if __name__ == '__main__':
             GeneralizeDEM.execute(demdataset, marine, output, outputcellsize,
                                   minacc1, minlen1, minacc2, minlen2,
                                   is_widen, widentype, widendist, filtersize,
-                                  is_smooth, tilesize, 0, is_parallel, continued, continued_folder)
+                                  is_smooth, tilesize, num_processes, is_parallel, continued, continued_folder)
         else:
             msg = 'ArcGIS for Desktop Advanced license not available'
             arcpy.AddError(msg)
