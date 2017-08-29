@@ -112,7 +112,7 @@ def call(oid,
                     dem.save(rastertinworkspace + '/' + raster + "_e")
                     dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
 
-                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only = True)
+                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only=True)
 
                     process_marine = True
 
@@ -143,6 +143,7 @@ def call(oid,
 
         stream_processing = True
 
+        # If there are any streams extracted
         if maxstr == 1:
             str1 = SetNull(str1_0, 1, "value = 0")
 
@@ -153,20 +154,26 @@ def call(oid,
             endpoints1 = workspace + "/endpoints1"
             arcpy.FeatureVerticesToPoints_management(streams1, endpoints1, "END")
 
-            endbuffers1 = workspace + "/endbuffers1"
-            radius = 2 * cellsize
-            arcpy.AddMessage("Buffering endpoints...")
-            arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
+            # radius = 2 * cellsize
 
-            rendbuffers1 = workspace + "/rendbuffers1"
-            arcpy.FeatureToRaster_conversion(endbuffers1, "OBJECTID", rendbuffers1, cellsize)
+            radius = 1 # number of cells
+
+            rpts1 = workspace + "/rpts1"
+            arcpy.PointToRaster_conversion(endpoints1, cellsize=cellsize)
+
+            arcpy.AddMessage("Buffering endpoints...")
+            rpts11 = Con(rpts1, 1, 0, "Value>0")
+            rendbufers1 = Expand(rpts11, radius, [1])
+
+            # endbuffers1 = workspace + "/endbuffers1"
+            # arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
+            # rendbuffers1 = workspace + "/rendbuffers1"
+            # arcpy.FeatureToRaster_conversion(endbuffers1, "OBJECTID", rendbuffers1, cellsize)
 
             mask = CreateConstantRaster(0, "INTEGER", cellsize, dem.extent)
-
             arcpy.Mosaic_management(mask, rendbuffers1, "MAXIMUM", "FIRST", "", "", "", "0.3", "NONE")
 
             arcpy.AddMessage("Erasing streams...")
-
             str1_e = SetNull(rendbuffers1, str1, "value > 0")
 
             arcpy.AddMessage("Vectorizing erased streams...")
@@ -249,16 +256,22 @@ def call(oid,
             arcpy.FeatureVerticesToPoints_management(streams2_e, endpoints2_e, "END")
 
             arcpy.AddMessage("Buffering primary streams...")
-            streambuffer = workspace + "/streams1_b"
-            arcpy.Buffer_analysis(streams1, streambuffer, radius, "FULL", "ROUND", "NONE", "")
+            streambuffer = Expand(str1, radius, [1])
+            # streambuffer = workspace + "/streams1_b"
+            # arcpy.Buffer_analysis(streams1, streambuffer, radius, "FULL", "ROUND", "NONE", "")
 
             arcpy.AddMessage("Selecting endpoints...")
-            pointslyr = "points"
-            arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
-            arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
+            # pointslyr = "points"
+            # arcpy.MakeFeatureLayer_management(endpoints2_e, pointslyr)
+            # arcpy.SelectLayerByLocation_management(pointslyr, "INTERSECT", streambuffer)
+            # pourpts2 = workspace + "/pourpts2"
+            # arcpy.CopyFeatures_management(pointslyr, pourpts2)
 
-            pourpts2 = workspace + "/pourpts2"
-            arcpy.CopyFeatures_management(pointslyr, pourpts2)
+            rpts2= workspace + "/rpts2"
+            arcpy.PointToRaster_conversion(endpoints2_e, cellsize=cellsize)
+            # rpts21 = Con(rpts2, 1, 0, "Value>0")
+            pourpts2 = ExtractByMask(rpts2, streambuffer)
+
 
             arcpy.AddMessage("Deriving secondary pour pts 1...")
             pour21 = SnapPourPoint(pourpts2, acc_e, cellsize * 1.5, "")

@@ -10,7 +10,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------
     demdataset = 'X:/Work/Scripts & Tools/MY/DEMGEN/mistral'
     marine = 'X:/Work/Scripts & Tools/MY/DEMGEN/DEMGENEW.gdb/ne_10m_ocean_P'
-    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/mistral_gen'
+    output = 'X:/Work/DEMGEN/DEMGENEW.gdb/mistral_gen2'
     outputcellsize = 2000
     minacc1 = 40
     minlen1 = 10
