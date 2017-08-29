@@ -112,7 +112,7 @@ def call(oid,
                     dem.save(rastertinworkspace + '/' + raster + "_e")
                     dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
 
-                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d)
+                    arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only = True)
 
                     process_marine = True
 
