@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="pybind11"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="msvc8"/>
+		<Option virtualFolders="CMake Files\;CMake Files\pybind11\;CMake Files\pybind11\tools\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-release/pybind11"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-release\pybind11\Makefile VERBOSE=1 all"/>
+					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-release\pybind11\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-release\pybind11\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-release\pybind11\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="Y:/GitHub/generalize-dem/src/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+		<Unit filename="Y:/GitHub/generalize-dem/src/pybind11/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\pybind11\"/>
+		</Unit>
+		<Unit filename="Y:/GitHub/generalize-dem/src/pybind11/tools/FindPythonLibsNew.cmake">
+			<Option virtualFolder="CMake Files\pybind11\tools\"/>
+		</Unit>
+		<Unit filename="Y:/GitHub/generalize-dem/src/pybind11/tools/pybind11Tools.cmake">
+			<Option virtualFolder="CMake Files\pybind11\tools\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

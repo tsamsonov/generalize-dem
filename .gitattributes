@@ -1,0 +1,3 @@
+src/pybind11/* linguist-vendored
+src/cmake-build-debug/* linguist-generated
+src/cmake-build-release/* linguist-generated

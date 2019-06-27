@@ -1,10 +1,11 @@
 # -*- coding: cp1251 -*-
 # Raster stream network generalization by Leonowicz-Jenny algorithm
-# 2017, Timofey Samsonov, Lomonosov Moscow State University
+# 2017-2019, Timofey Samsonov, Lomonosov Moscow State University
 import sys
 import arcpy
 import numpy
 import traceback
+import StreamExtractor
 
 MAXACC = 0
 
@@ -124,6 +125,15 @@ def process_raster(inraster, minacc, minlen):
         arcpy.AddError(pymsg)
         raise Exception
 
+def process_raster_cpp(inraster, minacc, minlen):
+
+        nrow = inraster.shape[0]
+        ncol = inraster.shape[1]
+
+        outraster = numpy.zeros((nrow, ncol))
+
+        return StreamExtractor.extract_streams(inraster, outraster, minacc, minlen)
+
 
 def execute(inraster, outraster, minacc, minlen):
     global MAXACC
@@ -133,7 +143,7 @@ def execute(inraster, outraster, minacc, minlen):
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing stream lines...")
-    newrasternumpy = process_raster(rasternumpy, minacc, minlen)
+    newrasternumpy = process_raster_cpp(rasternumpy, minacc, minlen)
 
     desc = arcpy.Describe(inraster)
     lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)

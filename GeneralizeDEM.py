@@ -601,7 +601,7 @@ def execute(demdataset,
 
             arcpy.AddMessage('> Already processed oids = ' + str(oids_done))
 
-            arcpy.AddMessage('> Prccessing oids = ' + str(oids))
+            arcpy.AddMessage('> Proccessing oids = ' + str(oids))
 
         # PERFORM PROCESSING
 
