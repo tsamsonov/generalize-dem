@@ -159,11 +159,11 @@ def call(oid,
             radius = 1 # number of cells
 
             rpts1 = workspace + "/rpts1"
-            arcpy.PointToRaster_conversion(endpoints1, cellsize=cellsize)
+            arcpy.PointToRaster_conversion(endpoints1, 'grid_code', rpts1, cellsize=cellsize)
 
             arcpy.AddMessage("Buffering endpoints...")
             rpts11 = Con(rpts1, 1, 0, "Value>0")
-            rendbufers1 = Expand(rpts11, radius, [1])
+            rendbuffers1 = Expand(rpts11, radius, [1])
 
             # endbuffers1 = workspace + "/endbuffers1"
             # arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
@@ -267,8 +267,8 @@ def call(oid,
             # pourpts2 = workspace + "/pourpts2"
             # arcpy.CopyFeatures_management(pointslyr, pourpts2)
 
-            rpts2= workspace + "/rpts2"
-            arcpy.PointToRaster_conversion(endpoints2_e, cellsize=cellsize)
+            rpts2 = workspace + "/rpts2"
+            arcpy.PointToRaster_conversion(endpoints2_e, 'grid_code', rpts2, cellsize=cellsize)
             # rpts21 = Con(rpts2, 1, 0, "Value>0")
             pourpts2 = ExtractByMask(rpts2, streambuffer)
 
@@ -672,9 +672,10 @@ def execute(demdataset,
             falseoids = []
             for state, oid in zip(jobs, oids):
                 if state == False:
-                    falseoids.append(str(oid))
+                    falseoids.append(oid)
 
-            arcpy.AddMessage('Failed to generalize tiles with OID = ' + str(falseoids))
+            if len(falseoids) > 0:
+                arcpy.AddMessage('Failed to generalize tiles with OID = ' + str(falseoids))
 
         # FINALIZE
 
