@@ -143,6 +143,8 @@ def call(oid,
 
         stream_processing = True
 
+        features = [] # to be filled with features for TIN construction
+
         # If there are any streams extracted
         if maxstr == 1:
             str1 = SetNull(str1_0, 1, "value = 0")
@@ -348,7 +350,7 @@ def call(oid,
 
             arcpy.AddMessage("TIN construction...")
 
-            features = []
+
             s1 = "'" + streams1_3d + "' Shape.Z " + "hardline"
             w1 = "'" + watersheds1_3d + "' Shape.Z " + "softline"
             w2 = "'" + watersheds2_3d + "' Shape.Z " + "softline"
@@ -359,10 +361,6 @@ def call(oid,
             if process_marine:
                 m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
                 features.append(m2)
-
-            featurestring = ';'.join(features)
-
-            arcpy.ddd.CreateTin(tin, "", featurestring, "")
 
             # arcpy.AddMessage("CLEANING SUPPLEMENTARY DATA")
             # arcpy.Delete_management(str2_0)
@@ -403,6 +401,9 @@ def call(oid,
                 arcpy.EditTin_3d(tin, features)
 
             stream_processing = False
+
+        featurestring = ';'.join(features)
+        arcpy.ddd.CreateTin(tin, "", featurestring, "")
 
         # GENERALIZED RASTER SURFACE
         arcpy.AddMessage("TIN to raster conversion...")
