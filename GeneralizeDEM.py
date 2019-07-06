@@ -82,13 +82,13 @@ def call(oid,
         marine_area = None
         process_marine = False
         marine_3d = workspace + "/marine_3d"
+        cell_erased = workspace + "/cell_erased" + str(i)
         if marine:
             arcpy.AddMessage("Extracting marine area...")
             marine_area = workspace + "/land" + str(i)
             arcpy.Clip_analysis(marine, cell[0], marine_area)
             if arcpy.Exists(marine_area):
                 if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
-                    cell_erased = workspace + "/cell_erased" + str(i)
                     arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
 
                     nareas = 0
@@ -335,9 +335,12 @@ def call(oid,
 
             # PROCESSING NARROW AREAS WITHOUT WATERSHEDS
 
-            basins = Basin(dir)
-            outer = SetNull(wsh1, basins, 'VALUE > 0')
-
+            arcpy.AddMessage("Processing remaining basins...")
+            bsn = Basin(dir)
+            basins = workspace + "/basins"
+            arcpy.RasterToPolygon_conversion(bsn, basins, True, "")
+            basins_e = workspace + "/basins_e"
+            arcpy.Erase_analysis(basins, watersheds1, basins_e)
 
             arcpy.AddMessage("Interpolating features into 3D...")
 
@@ -351,6 +354,9 @@ def call(oid,
             watersheds2_3d = workspace + "/watersheds2_3d"
             arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, watersheds2, watersheds2_3d)
 
+            basins_e_3d = workspace + "/basins_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, basins_e, basins_e_3d)
+
             # GENERALIZED TIN SURFACE
 
             arcpy.AddMessage("DERIVING GENERALIZED SURFACE")
@@ -361,10 +367,12 @@ def call(oid,
             s1 = "'" + streams1_3d + "' Shape.Z " + "hardline"
             w1 = "'" + watersheds1_3d + "' Shape.Z " + "softline"
             w2 = "'" + watersheds2_3d + "' Shape.Z " + "softline"
+            b = "'" + basins_e_3d + "' Shape.Z " + "softline"
 
             features.append(s1)
             features.append(w1)
             features.append(w2)
+            features.append(b)
             if process_marine:
                 m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
                 features.append(m2)
@@ -441,11 +449,26 @@ def call(oid,
 
         if process_marine:
             arcpy.AddMessage("Masking marine regions...")
-            result_erased = ExtractByMask(result, cell_erased)
-            arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
-            arcpy.AddMessage("Saving result...")
-            res = arcpy.Raster(rastertin)
-            res.save(scratchworkspace + '/gen/dem' + str(i))
+            try:
+                result_erased = ExtractByMask(result, cell_erased)
+                arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
+                arcpy.AddMessage("Saving result...")
+                res = arcpy.Raster(rastertin)
+                res.save(scratchworkspace + '/gen/dem' + str(i))
+            except:
+                arcpy.AddMessage("Retrying to mask in raster mode...")
+                erased_r = workspace + "/erased_r"
+
+                arcpy.PolygonToRaster_conversion(cell_erased, "OBJECTID",
+                                                 erased_r, cellsize=cellsize)
+
+                result_erased = SetNull(erased_r, result, "value is NULL")
+                # result_erased = ExtractByMask(result, erased_r)
+
+                arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
+                arcpy.AddMessage("Saving result...")
+                res = arcpy.Raster(rastertin)
+                res.save(scratchworkspace + '/gen/dem' + str(i))
         else:
             arcpy.AddMessage("Saving result...")
             result.save(scratchworkspace + '/gen/dem' + str(i))
@@ -624,7 +647,7 @@ def execute(demdataset,
                 if nproc < 1:
                     nproc = 1
             elif num_processes >= 1:
-                nproc = math.ceil(num_processes)
+                nproc = int(math.ceil(num_processes))
 
             arcpy.AddMessage('> Trying to make multiprocessing using ' + str(nproc) + ' processor cores')
             arcpy.AddMessage('')
