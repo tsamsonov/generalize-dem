@@ -311,11 +311,11 @@ class WidenLandforms(object):
         return params
 
     def isLicensed(self):
-        try:
-            if arcpy.CheckExtension("Spatial") != "Available":
-                raise Exception
-        except Exception:
-            return False  # tool cannot be executed
+        # try:
+        #     if arcpy.CheckExtension("Spatial") != "Available":
+        #         raise Exception
+        # except Exception:
+        #     return False  # tool cannot be executed
 
         return True  # tool can be executed
 
@@ -522,11 +522,11 @@ class GeneralizeDEM(object):
         return params
 
     def isLicensed(self):
-        try:
-            if arcpy.CheckExtension("Spatial") != "Available" or arcpy.CheckExtension("3D") != "Available":
-                raise Exception
-        except Exception:
-            return False  # tool cannot be executed
+        # try:
+        #     if arcpy.CheckExtension("Spatial") != "Available" or arcpy.CheckExtension("3D") != "Available":
+        #         raise Exception
+        # except Exception:
+        #     return False  # tool cannot be executed
         return True  # tool can be executed
 
     def updateParameters(self, parameters):

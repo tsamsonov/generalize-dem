@@ -133,7 +133,7 @@ py::array_t<double> extract_streams(py::array_t<double> in_raster, py::array_t<d
     return out_raster;
 }
 
-PYBIND11_MODULE(StreamExtractor, m) {
+PYBIND11_MODULE(StreamExtractor3, m) {
     m.doc() = R"pbdoc(
         C++ plugin for extracting streams from raster DEM
         -----------------------

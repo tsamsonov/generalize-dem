@@ -258,11 +258,11 @@ PYBIND11_PYTHON_VERSION:STRING=3.6
 //Build pybind11 test suite?
 PYBIND11_TEST:BOOL=OFF
 
+//Dependencies for the target
+StreamExtractor3_LIB_DEPENDS:STATIC=general;C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/libs/Python36.lib;
+
 //Value Computed by CMake
 StreamExtractor_BINARY_DIR:STATIC=Y:/GitHub/generalize-dem/src/cmake-build-debug
-
-//Dependencies for the target
-StreamExtractor_LIB_DEPENDS:STATIC=general;C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/libs/Python36.lib;
 
 //Value Computed by CMake
 StreamExtractor_SOURCE_DIR:STATIC=Y:/GitHub/generalize-dem/src

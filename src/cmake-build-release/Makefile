@@ -112,17 +112,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named StreamExtractor
+# Target rules for targets named StreamExtractor3
 
 # Build rule for target.
-StreamExtractor: cmake_check_build_system
-	$(MAKE) -f CMakeFiles\Makefile2 /nologo -$(MAKEFLAGS) StreamExtractor
-.PHONY : StreamExtractor
+StreamExtractor3: cmake_check_build_system
+	$(MAKE) -f CMakeFiles\Makefile2 /nologo -$(MAKEFLAGS) StreamExtractor3
+.PHONY : StreamExtractor3
 
 # fast build rule for target.
-StreamExtractor\fast:
-	$(MAKE) -f CMakeFiles\StreamExtractor.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor.dir\build
-.PHONY : StreamExtractor\fast
+StreamExtractor3\fast:
+	$(MAKE) -f CMakeFiles\StreamExtractor3.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor3.dir\build
+.PHONY : StreamExtractor3\fast
 
 ExtractStreams.obj: ExtractStreams.cpp.obj
 
@@ -130,7 +130,7 @@ ExtractStreams.obj: ExtractStreams.cpp.obj
 
 # target to build an object file
 ExtractStreams.cpp.obj:
-	$(MAKE) -f CMakeFiles\StreamExtractor.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor.dir\ExtractStreams.cpp.obj
+	$(MAKE) -f CMakeFiles\StreamExtractor3.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor3.dir\ExtractStreams.cpp.obj
 .PHONY : ExtractStreams.cpp.obj
 
 ExtractStreams.i: ExtractStreams.cpp.i
@@ -139,7 +139,7 @@ ExtractStreams.i: ExtractStreams.cpp.i
 
 # target to preprocess a source file
 ExtractStreams.cpp.i:
-	$(MAKE) -f CMakeFiles\StreamExtractor.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor.dir\ExtractStreams.cpp.i
+	$(MAKE) -f CMakeFiles\StreamExtractor3.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor3.dir\ExtractStreams.cpp.i
 .PHONY : ExtractStreams.cpp.i
 
 ExtractStreams.s: ExtractStreams.cpp.s
@@ -148,7 +148,7 @@ ExtractStreams.s: ExtractStreams.cpp.s
 
 # target to generate assembly for a file
 ExtractStreams.cpp.s:
-	$(MAKE) -f CMakeFiles\StreamExtractor.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor.dir\ExtractStreams.cpp.s
+	$(MAKE) -f CMakeFiles\StreamExtractor3.dir\build.make /nologo -$(MAKEFLAGS) CMakeFiles\StreamExtractor3.dir\ExtractStreams.cpp.s
 .PHONY : ExtractStreams.cpp.s
 
 # Help Target
@@ -157,8 +157,8 @@ help:
 	@echo ... all (the default if no target is provided)
 	@echo ... clean
 	@echo ... depend
-	@echo ... StreamExtractor
 	@echo ... edit_cache
+	@echo ... StreamExtractor3
 	@echo ... rebuild_cache
 	@echo ... ExtractStreams.obj
 	@echo ... ExtractStreams.i

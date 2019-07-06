@@ -1,18 +1,19 @@
 # -*- coding: cp1251 -*-
 # DEM generalization algorithm
-# Important note:  ExtractStreams and WidenLandforms scripts must be in the same directory,
-# otherwise Generalize DEM tool will not be able reference them
-# 2015-2017 Timofey Samsonov, Lomonosov Moscow State University
+# Important note:  all *.py scripts must be in the same directory,
+# otherwise Generalize DEM tool will not be able to reference them
+# 2015-2019 Timofey Samsonov, Lomonosov Moscow State University
 
 import arcpy
 import math
 import multiprocessing
-import time
 import sys
 import traceback
 from arcpy.sa import *
 from itertools import repeat
-import os.path, ExtractStreams, WidenLandforms, CreateFishnet
+import os.path
+import ExtractStreams, WidenLandforms, CreateFishnet
+
 __author__ = 'Timofey Samsonov'
 
 # Just a crutch for pool.map (Python 2.7)
@@ -44,8 +45,8 @@ def call(oid,
             arcpy.AddMessage('\nNOTHING TO GENERALIZE: tile ' + str(i + 1) + ' is empty. Finishing...\n')
             return True
 
-        arcpy.CheckOutExtension("Spatial")
-        arcpy.CheckOutExtension("3D")
+        # arcpy.CheckOutExtension("Spatial")
+        # arcpy.CheckOutExtension("3D")
 
         dem0 = arcpy.Raster(scratchworkspace + '/source/' + raster)
         dem = dem0
@@ -103,8 +104,8 @@ def call(oid,
                         # arcpy.Delete_management(workspace)
                         # arcpy.Delete_management(rastertinworkspace)
 
-                        arcpy.CheckInExtension("3D")
-                        arcpy.CheckInExtension("Spatial")
+                        # arcpy.CheckInExtension("3D")
+                        # arcpy.CheckInExtension("Spatial")
 
                         return True
                     else:
@@ -332,6 +333,12 @@ def call(oid,
 
                 arcpy.RasterToPolygon_conversion(wsh2_m, watersheds2, True, "")
 
+            # PROCESSING NARROW AREAS WITHOUT WATERSHEDS
+
+            basins = Basin(dir)
+            outer = SetNull(wsh1, basins, 'VALUE > 0')
+
+
             arcpy.AddMessage("Interpolating features into 3D...")
 
             streams1_3d = workspace + "/streams1_3d"
@@ -462,8 +469,8 @@ def call(oid,
         # arcpy.Delete_management(workspace)
         # arcpy.Delete_management(rastertinworkspace)
 
-        arcpy.CheckInExtension("3D")
-        arcpy.CheckInExtension("Spatial")
+        # arcpy.CheckInExtension("3D")
+        # arcpy.CheckInExtension("Spatial")
 
         return True
 
@@ -497,13 +504,12 @@ def execute(demdataset,
             continued_folder=None):
 
     try:
-        arcpy.CheckOutExtension("3D")
-        arcpy.CheckOutExtension("Spatial")
+        # arcpy.CheckOutExtension("3D")
+        # arcpy.CheckOutExtension("Spatial")
 
         arcpy.env.overwriteOutput = True
 
         # ORGANIZE WORKSPACE
-
 
         workspace = os.path.dirname(output)
         scratchworkspace = workspace

@@ -5,7 +5,21 @@ import sys
 import arcpy
 import numpy
 import traceback
-import StreamExtractor
+
+can_use_cpp = True
+
+if sys.version_info[:2] == (2, 7):  # ArcGIS for Desktop 10.3+, Python 2.7
+    try:
+        import StreamExtractor
+    except:
+        can_use_cpp = False
+elif sys.version_info[:2] == (3, 6):  # ArcGIS Pro, Python 3.6
+    try:
+        import StreamExtractor3 as StreamExtractor
+    except:
+        can_use_cpp = False
+else:
+    can_use_cpp = False
 
 MAXACC = 0
 
@@ -127,13 +141,12 @@ def process_raster(inraster, minacc, minlen):
 
 def process_raster_cpp(inraster, minacc, minlen):
 
-        nrow = inraster.shape[0]
-        ncol = inraster.shape[1]
+    nrow = inraster.shape[0]
+    ncol = inraster.shape[1]
 
-        outraster = numpy.zeros((nrow, ncol))
+    outraster = numpy.zeros((nrow, ncol))
 
-        return StreamExtractor.extract_streams(inraster, outraster, minacc, minlen)
-
+    return StreamExtractor.extract_streams(inraster, outraster, minacc, minlen)
 
 def execute(inraster, outraster, minacc, minlen):
     global MAXACC
@@ -143,7 +156,8 @@ def execute(inraster, outraster, minacc, minlen):
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing stream lines...")
-    newrasternumpy = process_raster_cpp(rasternumpy, minacc, minlen)
+    newrasternumpy = process_raster_cpp(rasternumpy, minacc, minlen) if can_use_cpp \
+                else process_raster(rasternumpy, minacc, minlen)
 
     desc = arcpy.Describe(inraster)
     lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
@@ -161,7 +175,7 @@ if __name__ == "__main__":
         inRaster = arcpy.GetParameterAsText(0)
         outRaster = arcpy.GetParameterAsText(1)
         minAcc = float(arcpy.GetParameterAsText(2))
-        minLen = long(arcpy.GetParameterAsText(3))
+        minLen = int(arcpy.GetParameterAsText(3))
 
         execute(inRaster, outRaster, minAcc, minLen)
     except:

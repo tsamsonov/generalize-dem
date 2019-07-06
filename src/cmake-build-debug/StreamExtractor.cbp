@@ -17,57 +17,57 @@
 					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="StreamExtractor">
-				<Option output="Y:/GitHub/generalize-dem/src/cmake-build-debug/StreamExtractor.cp36-win_amd64.pyd" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-debug"/>
-				<Option object_output="./"/>
-				<Option type="3"/>
-				<Option compiler="msvc8"/>
-				<Compiler>
-					<Add directory="Y:/GitHub/generalize-dem/src/pybind11/include"/>
-					<Add directory="C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.20.27508\include"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\ucrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\shared"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\um"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\winrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\cppwinrt"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 StreamExtractor"/>
-					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="StreamExtractor/fast">
-				<Option output="Y:/GitHub/generalize-dem/src/cmake-build-debug/StreamExtractor.cp36-win_amd64.pyd" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-debug"/>
-				<Option object_output="./"/>
-				<Option type="3"/>
-				<Option compiler="msvc8"/>
-				<Compiler>
-					<Add directory="Y:/GitHub/generalize-dem/src/pybind11/include"/>
-					<Add directory="C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/include"/>
-					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.20.27508\include"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\ucrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\shared"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\um"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\winrt"/>
-					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\cppwinrt"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 StreamExtractor/fast"/>
-					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
 			<Target title="edit_cache">
 				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-debug"/>
 				<Option type="4"/>
 				<MakeCommands>
 					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 edit_cache"/>
+					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="StreamExtractor3">
+				<Option output="Y:/GitHub/generalize-dem/src/cmake-build-debug/StreamExtractor3.cp36-win_amd64.pyd" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="msvc8"/>
+				<Compiler>
+					<Add directory="Y:/GitHub/generalize-dem/src/pybind11/include"/>
+					<Add directory="C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/include"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.20.27508\include"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\ucrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\shared"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\um"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\winrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\cppwinrt"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 StreamExtractor3"/>
+					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="StreamExtractor3/fast">
+				<Option output="Y:/GitHub/generalize-dem/src/cmake-build-debug/StreamExtractor3.cp36-win_amd64.pyd" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="Y:/GitHub/generalize-dem/src/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="msvc8"/>
+				<Compiler>
+					<Add directory="Y:/GitHub/generalize-dem/src/pybind11/include"/>
+					<Add directory="C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/include"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC\14.20.27508\include"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\ucrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\shared"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\um"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\winrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.17763.0\cppwinrt"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 StreamExtractor3/fast"/>
 					<CompileFile command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 &quot;$file&quot;"/>
 					<Clean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
 					<DistClean command="nmake /NOLOGO /f Y:\GitHub\generalize-dem\src\cmake-build-debug\Makefile VERBOSE=1 clean"/>
@@ -85,7 +85,7 @@
 			</Target>
 		</Build>
 		<Unit filename="Y:/GitHub/generalize-dem/src/ExtractStreams.cpp">
-			<Option target="StreamExtractor"/>
+			<Option target="StreamExtractor3"/>
 		</Unit>
 		<Unit filename="Y:/GitHub/generalize-dem/src/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\"/>
