@@ -83,6 +83,7 @@ def call(oid,
         process_marine = False
         marine_3d = workspace + "/marine_3d"
         cell_erased = workspace + "/cell_erased" + str(i)
+
         if marine:
             arcpy.AddMessage("Extracting marine area...")
             marine_area = workspace + "/land" + str(i)
@@ -194,6 +195,7 @@ def call(oid,
 
             arcpy.AddMessage("Vectorizing primary watersheds...")
             watersheds1 = workspace + "/watersheds1"
+
             try:
                 arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
             except:
@@ -407,13 +409,28 @@ def call(oid,
             # arcpy.Delete_management(acc_e)
 
         else:
-            arcpy.AddMessage("\n> NO STREAMS DETECTED. USING TIN DECIMATION TO GENERALIZE RASTER\n")
-            zTol = 0.5*(dem.maximum - dem.minimum)
-            arcpy.RasterTin_3d(dem0, tin, zTol)
+
+            arcpy.AddMessage("NO STREAMS DETECTED. PROCESSING BASINS...")
+            bsn = Basin(dir)
+            basins = workspace + "/basins"
+            arcpy.RasterToPolygon_conversion(bsn, basins, True, "")
+            basins_3d = workspace + "/basins_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, basins, basins_3d)
+            b = "'" + basins_3d + "' Shape.Z " + "softline"
+            features.append(b)
 
             if process_marine:
-                features = [[marine_3d, 'Shape', '<None>', 'hardline', True]]
-                arcpy.EditTin_3d(tin, features)
+                m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
+                features.append(m2)
+
+            # Temporarily deprecated in favour of Basin Tool
+            # arcpy.AddMessage("\n> NO STREAMS DETECTED. USING TIN DECIMATION TO GENERALIZE RASTER\n")
+            # zTol = 0.5*(dem.maximum - dem.minimum)
+            # arcpy.RasterTin_3d(dem0, tin, zTol)
+            #
+            # if process_marine:
+            #     features = [[marine_3d, 'Shape', '<None>', 'hardline', True]]
+            #     arcpy.EditTin_3d(tin, features)
 
             stream_processing = False
 
@@ -435,14 +452,14 @@ def call(oid,
 
         # Widen valleys and ridges
         widenraster = rastertin
-        if is_widen == "true" and stream_processing:
+        if is_widen and stream_processing:
             arcpy.AddMessage("Raster widening...")
             widenraster = workspace + "/widenraster"
             WidenLandforms.execute(rastertin, streams1, widendist, filtersize, widenraster, widentype)
 
         # Smooth DEM
         result = arcpy.Raster(widenraster)
-        if is_smooth == "true":
+        if is_smooth:
             arcpy.AddMessage("Raster filtering...")
             neighborhood = NbrRectangle(filtersize, filtersize, "CELL")
             result = FocalStatistics(widenraster, neighborhood, "MEAN", "DATA")
@@ -520,10 +537,11 @@ def execute(demdataset,
             widendist,
             filtersize,
             is_smooth,
+            is_tiled,
             tile_size,
-            num_processes,
             is_parallel,
-            continued=False,
+            num_processes,
+            is_continued=False,
             continued_folder=None):
 
     try:
@@ -537,7 +555,7 @@ def execute(demdataset,
         workspace = os.path.dirname(output)
         scratchworkspace = workspace
 
-        if(continued):
+        if is_continued:
             scratchworkspace = continued_folder
             arcpy.AddMessage('\n> CONTINUING PREVIOUS PROCESSING')
         else:
@@ -575,6 +593,8 @@ def execute(demdataset,
         ncols = int(math.ceil(float(demsource.width) / float(tile_size)))
         total = nrows * ncols
 
+        is_tiled = is_tiled and total > 1
+
         cellsize = 0.5 * (demsource.meanCellHeight + demsource.meanCellWidth)
 
         bufferpixelwidth = math.ceil(max(demsource.width, demsource.height) / (max(nrows, ncols) * 10))
@@ -585,43 +605,10 @@ def execute(demdataset,
         fishbuffer = workspace + "/fishbuffer"
         fishmaskbuffer = workspace + "/fishmaskbuffer"
 
-        if(not continued):
-            # SPLIT THE TASK INTO TILES
+        oids = []
 
-            arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
-            arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
+        if is_continued:
 
-            arcpy.AddMessage('Creating fishnet...')
-
-            CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap,
-                                  split=True, shrink=cellsize)
-
-            arcpy.AddMessage('Creating split buffer...')
-
-            CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap,
-                                  split=False, shrink=cellsize)
-
-            arcpy.AddMessage('Creating mask buffer...')
-            mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
-
-            CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap,
-                                  split=False, overlap2=mask_overlap, shrink=cellsize)
-
-            arcpy.AddMessage('Splitting raster...')
-            arcpy.env.extent = demsource.extent # Very important!
-            arcpy.env.snapRaster = demsource # Very important!
-            arcpy.SplitRaster_management(demdataset,
-                                         scratchworkspace + "/source",
-                                         'dem',
-                                         split_method='NUMBER_OF_TILES',
-                                         format='GRID',
-                                         num_rasters = str(ncols) + ' ' + str(nrows),
-                                         overlap=2*bufferpixelwidth)
-
-        rows = arcpy.da.SearchCursor(fishnet, 'OID@')
-        oids = [int(row[0]) for row in rows]
-
-        if (continued):
             arcpy.env.workspace = scratchworkspace + '/gen'
             rasters = arcpy.ListRasters("*", "GRID")
 
@@ -633,11 +620,55 @@ def execute(demdataset,
 
             arcpy.AddMessage('> Proccessing oids = ' + str(oids))
 
+        else:
+
+            if is_tiled: # SPLIT THE TASK INTO TILES
+
+                arcpy.AddMessage('Splitting raster into ' + str(nrows) + ' x ' + str(ncols) + ' = ' + str(total) + ' tiles')
+                arcpy.AddMessage('Tile overlap will be ' + str(2 * bufferpixelwidth) + ' pixels')
+
+                arcpy.AddMessage('Creating fishnet...')
+
+                CreateFishnet.execute(demdataset, fishnet, nrows, ncols, overlap,
+                                      split=True, shrink=cellsize)
+
+                arcpy.AddMessage('Creating split buffer...')
+
+                CreateFishnet.execute(demdataset, fishbuffer, nrows, ncols, overlap,
+                                      split=False, shrink=cellsize)
+
+                arcpy.AddMessage('Creating mask buffer...')
+                mask_overlap = max(demsource.meanCellHeight, demsource.meanCellWidth)
+
+                CreateFishnet.execute(demdataset, fishmaskbuffer, nrows, ncols, overlap,
+                                      split=False, overlap2=mask_overlap, shrink=cellsize)
+
+                arcpy.AddMessage('Splitting raster...')
+                arcpy.env.extent = demsource.extent # Very important!
+                arcpy.env.snapRaster = demsource # Very important!
+                arcpy.SplitRaster_management(demdataset,
+                                             scratchworkspace + "/source",
+                                             'dem',
+                                             split_method='NUMBER_OF_TILES',
+                                             format='GRID',
+                                             num_rasters = str(ncols) + ' ' + str(nrows),
+                                             overlap=2*bufferpixelwidth)
+
+
+                rows = arcpy.da.SearchCursor(fishnet, 'OID@')
+                oids = [int(row[0]) for row in rows]
+
+            else:
+                CreateFishnet.execute(demdataset, fishbuffer, 1, 1) # Just DEM envelope
+                arcpy.CopyRaster_management(demdataset, scratchworkspace + "/source/dem0")
+                oids = [1]
+
         # PERFORM PROCESSING
 
         jobs = []
 
-        if is_parallel == 'true':
+        if is_parallel and is_tiled:
+
             nproc = multiprocessing.cpu_count()
 
             if 0 < num_processes < 1:
@@ -709,39 +740,47 @@ def execute(demdataset,
 
         # FINALIZE
 
-        arcpy.AddMessage("CLIPPING AND MASKING GENERALIZED RASTERS")
-        arcpy.env.snapRaster = demsource
+        if is_tiled:
 
-        rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
-        i = 0
-        for row in rows:
-            raster = scratchworkspace + '/gen/dem' + str(i)
-            if arcpy.Exists(raster):
-                dem = arcpy.Raster(raster)
-                try:
-                    dem_clipped = ExtractByMask(dem, row[0])
-                    dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
-                except:
-                    arcpy.AddMessage('NOTHING TO EXTRACT: Tile ' + str(i) + ' has significant values only outside its frame')
-            i += 1
+            arcpy.AddMessage("CLIPPING AND MASKING GENERALIZED RASTERS")
+            arcpy.env.snapRaster = demsource
 
-        arcpy.env.workspace = scratchworkspace + '/gencrop'
-        rasters = arcpy.ListRasters("*", "GRID")
+            rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
+            i = 0
+            for row in rows:
+                raster = scratchworkspace + '/gen/dem' + str(i)
+                if arcpy.Exists(raster):
+                    dem = arcpy.Raster(raster)
+                    try:
+                        dem_clipped = ExtractByMask(dem, row[0])
+                        dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
+                    except:
+                        arcpy.AddMessage('NOTHING TO EXTRACT: Tile ' + str(i) + ' has significant values only outside its frame')
+                i += 1
 
-        if len(rasters) > 0:
-            rasters_str = ';'.join(rasters)
-            arcpy.AddMessage('SAVING RESULT')
-            arcpy.MosaicToNewRaster_management(rasters_str,
-                                               os.path.dirname(output),
-                                               os.path.basename(output),
-                                               "",
-                                               "16_BIT_SIGNED",
-                                               str(outputcellsize),
-                                               "1",
-                                               "BLEND",
-                                               "FIRST")
+            arcpy.env.workspace = scratchworkspace + '/gencrop'
+            rasters = arcpy.ListRasters("*", "GRID")
+
+            if len(rasters) > 0:
+                rasters_str = ';'.join(rasters)
+                arcpy.AddMessage('SAVING RESULT')
+                arcpy.MosaicToNewRaster_management(rasters_str,
+                                                   os.path.dirname(output),
+                                                   os.path.basename(output),
+                                                   "",
+                                                   "16_BIT_SIGNED",
+                                                   str(outputcellsize),
+                                                   "1",
+                                                   "BLEND",
+                                                   "FIRST")
+            else:
+                arcpy.AddMessage('NOTHING GENERALIZED')
         else:
-            arcpy.AddMessage('NOTHING GENERALIZED')
+            if arcpy.Exists(scratchworkspace + '/gen/dem0'):
+                arcpy.AddMessage('SAVING RESULT')
+                arcpy.CopyRaster_management(scratchworkspace + '/gen/dem0', output)
+            else:
+                arcpy.AddMessage('NOTHING GENERALIZED')
 
     except:
         tb = sys.exc_info()[2]
@@ -762,20 +801,20 @@ if __name__ == '__main__':
     minlen1 = int(arcpy.GetParameterAsText(5))
     minacc2 = int(arcpy.GetParameterAsText(6))
     minlen2 = int(arcpy.GetParameterAsText(7))
-    is_widen = arcpy.GetParameterAsText(8)
+    is_widen = True if arcpy.GetParameterAsText(8) == 'true' else False
     widentype = arcpy.GetParameterAsText(9)
     widendist = float(arcpy.GetParameterAsText(10))
     filtersize = int(arcpy.GetParameterAsText(11))
-    is_smooth = arcpy.GetParameterAsText(12)
-    is_tiled = arcpy.GetParameterAsText(13)
+    is_smooth = True if arcpy.GetParameterAsText(12) == 'true' else False
+    is_tiled = True if arcpy.GetParameterAsText(13) == 'true' else False
     tile_size = arcpy.GetParameterAsText(14)
-    is_parallel = arcpy.GetParameterAsText(15)
+    is_parallel = True if arcpy.GetParameterAsText(15) == 'true' else False
     num_processes = int(arcpy.GetParameterAsText(16))
-    continued = True if arcpy.GetParameterAsText(17) == 'true' else False
+    is_continued = True if arcpy.GetParameterAsText(17) == 'true' else False
     continued_folder = arcpy.GetParameterAsText(18)
 
     execute(demdataset, marine, output, outputcellsize,
             minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
-            is_smooth, tile_size, num_processes, is_parallel,
-            continued, continued_folder)
+            is_smooth, is_tiled, tile_size, is_parallel, num_processes,
+            is_continued, continued_folder)

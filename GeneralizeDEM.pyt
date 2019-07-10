@@ -544,16 +544,16 @@ class GeneralizeDEM(object):
         minlen1 = int(parameters[5].valueAsText)
         minacc2 = int(parameters[6].valueAsText)
         minlen2 = int(parameters[7].valueAsText)
-        is_widen = parameters[8].valueAsText
+        is_widen = True if parameters[8].valueAsText == 'true' else False
         widentype = parameters[9].valueAsText
         widendist = float(parameters[10].valueAsText)
         filtersize = int(parameters[11].valueAsText)
-        is_smooth = parameters[12].valueAsText
-        is_tiled = parameters[13].valueAsText
+        is_smooth = True if parameters[12].valueAsText == 'true' else False
+        is_tiled = True if parameters[13].valueAsText == 'true' else False
         tile_size = int(parameters[14].valueAsText)
-        is_parallel = parameters[15].valueAsText
+        is_parallel = True if parameters[15].valueAsText == 'true' else False
         num_processes = float(parameters[16].valueAsText)
-        continued = True if parameters[17].valueAsText == 'true' else False
+        is_continued = True if parameters[17].valueAsText == 'true' else False
         continued_folder = parameters[18].valueAsText
 
         GD.execute(demdataset,
@@ -569,10 +569,11 @@ class GeneralizeDEM(object):
                   widendist,
                   filtersize,
                   is_smooth,
+                  is_tiled,
                   tile_size,
-                  num_processes,
                   is_parallel,
-                  continued,
+                  num_processes,
+                  is_continued,
                   continued_folder)
 
         return
