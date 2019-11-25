@@ -1,24 +1,14 @@
 C:\Users\tsamsonov\AppData\Local\JetBrains\Toolbox\apps\CLion\ch-0\191.6183.77\bin\cmake\win\bin\cmake.exe -DCMAKE_BUILD_TYPE=Release -G "CodeBlocks - NMake Makefiles" Y:\GitHub\generalize-dem\src
--- The C compiler identification is MSVC 19.20.27508.1
--- The CXX compiler identification is MSVC 19.20.27508.1
--- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.20.27508/bin/Hostx64/x64/cl.exe
--- Check for working C compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.20.27508/bin/Hostx64/x64/cl.exe -- works
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Detecting C compile features
--- Detecting C compile features - done
--- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.20.27508/bin/Hostx64/x64/cl.exe
--- Check for working CXX compiler: C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.20.27508/bin/Hostx64/x64/cl.exe -- works
--- Detecting CXX compiler ABI info
--- Detecting CXX compiler ABI info - done
--- Detecting CXX compile features
--- Detecting CXX compile features - done
--- Found PythonInterp: C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe (found suitable version "3.6.6", minimum required is "3.6") 
--- Found PythonLibs: C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/libs/Python36.lib
--- pybind11 v2.2.0
--- Performing Test HAS_MSVC_GL_LTCG
--- Performing Test HAS_MSVC_GL_LTCG - Success
--- LTO enabled
--- Configuring done
--- Generating done
--- Build files have been written to: Y:/GitHub/generalize-dem/src/cmake-build-release
+CMake Error at C:/Users/tsamsonov/AppData/Local/JetBrains/Toolbox/apps/CLion/ch-0/191.6183.77/bin/cmake/win/share/cmake-3.13/Modules/FindPackageHandleStandardArgs.cmake:137 (message):
+  Could NOT find PythonInterp: Found unsuitable version "2.7.14", but
+  required is at least "3.6" (found C:/Python27/ArcGIS10.6/python.exe)
+Call Stack (most recent call first):
+  C:/Users/tsamsonov/AppData/Local/JetBrains/Toolbox/apps/CLion/ch-0/191.6183.77/bin/cmake/win/share/cmake-3.13/Modules/FindPackageHandleStandardArgs.cmake:376 (_FPHSA_FAILURE_MESSAGE)
+  C:/Users/tsamsonov/AppData/Local/JetBrains/Toolbox/apps/CLion/ch-0/191.6183.77/bin/cmake/win/share/cmake-3.13/Modules/FindPythonInterp.cmake:159 (FIND_PACKAGE_HANDLE_STANDARD_ARGS)
+  pybind11/tools/FindPythonLibsNew.cmake:60 (find_package)
+  pybind11/tools/pybind11Tools.cmake:16 (find_package)
+  pybind11/CMakeLists.txt:33 (include)
+
+
+-- Configuring incomplete, errors occurred!
+See also "Y:/GitHub/generalize-dem/src/cmake-build-release/CMakeFiles/CMakeOutput.log".
