@@ -106,7 +106,7 @@ def trace_flow_cells(accraster, streamraster, i, j, minacc, neigh, down = True):
             arcpy.AddMessage(n)
             start = seln[numpy.argsort(selcells)[0]]
             arcpy.AddMessage(start)
-            for k in range(start):
+            for k in range(start + 1):
                 streamraster[stream[k][0], stream[k][1]] = 1
             success = True
 
