@@ -10,6 +10,7 @@ import FilterDEM as FD
 import CreateFishnet as CF
 import GeneralizeDEM as GD
 import ExtractStreams as ES
+import FindClosestStreams as FS
 import WidenLandforms as WL
 
 class Toolbox(object):
@@ -20,7 +21,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
+        self.tools = [CreateFishnet, ExtractStreams, FindClosestStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
 
 class CreateFishnet(object):
 
@@ -169,6 +170,75 @@ class ExtractStreams(object):
         minlen = int(parameters[3].valueAsText)
 
         ES.execute(inraster, outraster, minacc, minlen)
+
+        return
+
+class FindClosestStreams(object):
+
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Find Closest Streams"
+        self.description = ""
+        self.canRunInBackground = True
+
+    def getParameterInfo(self):
+
+        in_streams = arcpy.Parameter(
+            displayName="Input rivers feature layer",
+            name="in_streams",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_raster = arcpy.Parameter(
+            displayName="Input flow accumulation raster",
+            name="in_raster",
+            datatype="GPRasterLayer",
+            parameterType="Required",
+            direction="Input")
+
+        out_raster = arcpy.Parameter(
+            displayName="Output stream raster",
+            name="out_raster",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Output")
+
+        min_acc = arcpy.Parameter(
+            displayName="Minimum flow accumulation",
+            name="min_acc",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        radius = arcpy.Parameter(
+            displayName="Search radius",
+            name="radius",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        params = [in_streams, in_raster, out_raster, min_acc, radius]
+        return params
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+
+        instreams = parameters[0].valueAsText
+        inraster = parameters[1].valueAsText
+        outraster = parameters[2].valueAsText
+        minacc = float(parameters[3].valueAsText)
+        radius = int(parameters[4].valueAsText)
+
+        FS.execute(instreams, inraster, outraster, minacc, radius)
 
         return
 
