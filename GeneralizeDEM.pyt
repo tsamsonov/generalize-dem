@@ -10,7 +10,7 @@ import FilterDEM as FD
 import CreateFishnet as CF
 import GeneralizeDEM as GD
 import ExtractStreams as ES
-import FindClosestStreams as FS
+import CounterpartStreams as CS
 import WidenLandforms as WL
 
 class Toolbox(object):
@@ -21,7 +21,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, FindClosestStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
+        self.tools = [CreateFishnet, ExtractStreams, TraceCounterpartStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
 
 class CreateFishnet(object):
 
@@ -173,18 +173,18 @@ class ExtractStreams(object):
 
         return
 
-class FindClosestStreams(object):
+class TraceCounterpartStreams(object):
 
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Find Closest Streams"
+        self.label = "Trace Counterpart Streams"
         self.description = ""
         self.canRunInBackground = True
 
     def getParameterInfo(self):
 
         in_streams = arcpy.Parameter(
-            displayName="Input rivers feature layer",
+            displayName="Input reference hydrographic lines",
             name="in_streams",
             datatype="GPFeatureLayer",
             parameterType="Required",
@@ -197,10 +197,10 @@ class FindClosestStreams(object):
             parameterType="Required",
             direction="Input")
 
-        out_raster = arcpy.Parameter(
-            displayName="Output stream raster",
-            name="out_raster",
-            datatype="DERasterDataset",
+        out_streams = arcpy.Parameter(
+            displayName="Output counterpart streams feature class",
+            name="out_streams",
+            datatype="DEFeatureClass",
             parameterType="Required",
             direction="Output")
 
@@ -212,13 +212,13 @@ class FindClosestStreams(object):
             direction="Input")
 
         radius = arcpy.Parameter(
-            displayName="Search radius",
+            displayName="Catch radius",
             name="radius",
             datatype="GPDouble",
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_raster, out_raster, min_acc, radius]
+        params = [in_streams, in_raster, out_streams, min_acc, radius]
         return params
 
     def isLicensed(self):
@@ -234,11 +234,11 @@ class FindClosestStreams(object):
 
         instreams = parameters[0].valueAsText
         inraster = parameters[1].valueAsText
-        outraster = parameters[2].valueAsText
+        outstreams = parameters[2].valueAsText
         minacc = float(parameters[3].valueAsText)
         radius = int(parameters[4].valueAsText)
 
-        FS.execute(instreams, inraster, outraster, minacc, radius)
+        CS.execute(instreams, inraster, outstreams, minacc, radius)
 
         return
 

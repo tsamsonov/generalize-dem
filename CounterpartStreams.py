@@ -72,7 +72,7 @@ def find_cell(accraster, i, j, Down = True):
     else:
         return find_up_cell(accraster, i, j)
 
-def trace_flow_cells(accraster, streamraster, i, j, minacc, neigh, down = True):
+def trace_flow_cells(accraster, i, j, minacc, neigh, down = True):
     acc = accraster[i, j]
     ik = i
     jk = j
@@ -80,35 +80,36 @@ def trace_flow_cells(accraster, streamraster, i, j, minacc, neigh, down = True):
     stream = []
     selcells = []
     seln = []
-
-    success = False
+    inside = False
 
     try:
+        if acc >= minacc:
+            while True:
+                current = (ik, jk)
 
-        while (acc >= minacc):
-            current = (ik, jk)
-            stream.append(current)
-            if current in neigh:
-                selcells.append(neigh.index(current))
-                seln.append(n)
+                if current in neigh:
+                    selcells.append(neigh.index(current))
+                    seln.append(n)
+                    inside = True
+                elif inside: # we previously get into the neighborhood
+                    break
 
-            iup, jup = find_cell(accraster, ik, jk, down)
+                stream.append(current)
 
-            acc = accraster[iup, jup]
-            if iup == ik and jup == jk:
-                break
+                inext, jnext = find_cell(accraster, ik, jk, down)
 
-            ik = iup
-            jk = jup
-            n += 1
+                if inext == ik and jnext == jk:
+                    break
 
-        if len(selcells) > 0:
-            arcpy.AddMessage(n)
-            start = seln[numpy.argsort(selcells)[0]]
-            arcpy.AddMessage(start)
-            for k in range(start + 1):
-                streamraster[stream[k][0], stream[k][1]] = 1
-            success = True
+                ik = inext
+                jk = jnext
+                n += 1
+
+            if len(selcells) > 0:
+                end = seln[numpy.argsort(selcells)[0]] + 1
+                return stream[0:end]
+            else: return []
+        else: return []
 
     except:
         tb = sys.exc_info()[2]
@@ -117,9 +118,6 @@ def trace_flow_cells(accraster, streamraster, i, j, minacc, neigh, down = True):
                 str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
         arcpy.AddError(pymsg)
         raise Exception
-
-    return success
-
 
 def extend_array(array, nx, ny, value):
     
@@ -167,6 +165,8 @@ def process_raster(inraster, minacc, radius, startxy, endxy, minx, miny, cellsiz
         extinraster = extend_array(inraster, 1, 1, 0)
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
+
+        streams = []
         for k in range(n):
 
             iend = ni - math.trunc((endxy[k][1] - miny) / cellsize) - 1
@@ -180,12 +180,21 @@ def process_raster(inraster, minacc, radius, startxy, endxy, minx, miny, cellsiz
 
             arcpy.SetProgressorLabel("Finding closest stream for river " + str(k) + " from " + str(n))
 
+            stream = []
             for (i, j) in startneigh:
                 if  minacc < inraster[i, j] > minacc:
-                    success = trace_flow_cells(extinraster, outraster, i, j, minacc, endneigh)
-                    if success:
+                    stream = trace_flow_cells(extinraster, i, j, minacc, endneigh)
+                    if len(stream) > 0:
                         break
+            streams.append(stream)
+
             arcpy.SetProgressorPosition(k)
+
+        streams.sort(key = len)
+
+        for k in range(n):
+            for l in range(len(streams[k])):
+                outraster[streams[k][l][0], streams[k][l][1]] = k
 
         return outraster
     except:
@@ -196,7 +205,7 @@ def process_raster(inraster, minacc, radius, startxy, endxy, minx, miny, cellsiz
         arcpy.AddError(pymsg)
         raise Exception
 
-def execute(instreams, inraster, outraster, minacc, radius):
+def execute(instreams, inraster, outstreams, minacc, radius):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -229,19 +238,21 @@ def execute(instreams, inraster, outraster, minacc, radius):
 
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
-    outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
+    outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, value_to_nodata=0))
     arcpy.DefineProjection_management(outinnerraster, crs)
-    outinnerraster.save(outraster)
+    # outinnerraster.save(outraster)
+
+    arcpy.RasterToPolyline_conversion(outinnerraster, outstreams, simplify='NO_SIMPLIFY')
 
 if __name__ == "__main__":
     try:
         inStreams = arcpy.GetParameterAsText(0)
         inRaster = arcpy.GetParameterAsText(1)
-        outRaster = arcpy.GetParameterAsText(2)
+        outStreams = arcpy.GetParameterAsText(2)
         minAcc = float(arcpy.GetParameterAsText(3))
         radius = float(arcpy.GetParameterAsText(4))
 
-        execute(inStreams, inRaster, outRaster, minAcc, radius)
+        execute(inStreams, inRaster, outStreams, minAcc, radius)
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
