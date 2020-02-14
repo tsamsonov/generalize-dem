@@ -72,7 +72,7 @@ def find_cell(accraster, i, j, Down = True):
     else:
         return find_up_cell(accraster, i, j)
 
-def trace_flow_cells(accraster, i, j, minacc, neigh, down = True):
+def trace_flow_cells(accraster, euc, i, j, minacc, neigh, down = True):
     acc = accraster[i, j]
     ik = i
     jk = j
@@ -80,6 +80,7 @@ def trace_flow_cells(accraster, i, j, minacc, neigh, down = True):
     stream = []
     selcells = []
     seln = []
+    e = []
     inside = False
 
     try:
@@ -95,6 +96,7 @@ def trace_flow_cells(accraster, i, j, minacc, neigh, down = True):
                     break
 
                 stream.append(current)
+                e.append(euc[ik, jk])
 
                 inext, jnext = find_cell(accraster, ik, jk, down)
 
@@ -107,9 +109,9 @@ def trace_flow_cells(accraster, i, j, minacc, neigh, down = True):
 
             if len(selcells) > 0:
                 end = seln[numpy.argsort(selcells)[0]] + 1
-                return stream[0:end]
-            else: return []
-        else: return []
+                return stream[0:end], e[0:end]
+            else: return [], []
+        else: return [], []
 
     except:
         tb = sys.exc_info()[2]
@@ -153,7 +155,7 @@ def get_neighborhood(i, j, radius, cellsize, ni, nj):
 
     return neigh
 
-def process_raster(inraster, minacc, radius, startxy, endxy, minx, miny, cellsize):
+def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, cellsize):
 
     try:
         global MAXACC
@@ -178,23 +180,29 @@ def process_raster(inraster, minacc, radius, startxy, endxy, minx, miny, cellsiz
             endneigh = get_neighborhood(iend, jend, radius, cellsize, ni, nj)
             startneigh = get_neighborhood(istart, jstart, radius, cellsize, ni, nj)
 
-            arcpy.SetProgressorLabel("Finding closest stream for river " + str(k) + " from " + str(n))
+            arcpy.AddMessage("Finding closest stream for river " + str(k) + " from " + str(n))
 
             stream = []
+            weight = float('Inf')
             for (i, j) in startneigh:
-                if  minacc < inraster[i, j] > minacc:
-                    stream = trace_flow_cells(extinraster, i, j, minacc, endneigh)
-                    if len(stream) > 0:
-                        break
+                if  inraster[i, j] > minacc:
+                    s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
+                    l = len(e)
+                    if l > 0 :
+                        w = sum(e)/l
+                        if w < weight:
+                            stream = s
+                            weight = w
             streams.append(stream)
-
+            
             arcpy.SetProgressorPosition(k)
 
+        arcpy.AddMessage(streams)
         streams.sort(key = len)
 
         for k in range(n):
             for l in range(len(streams[k])):
-                outraster[streams[k][l][0], streams[k][l][1]] = k
+                outraster[streams[k][l][0], streams[k][l][1]] = k + 1
 
         return outraster
     except:
@@ -232,15 +240,30 @@ def execute(instreams, inraster, outstreams, minacc, radius):
         x, y = row[0]
         endxy.append([x, y])
 
+    eucs = numpy.zeros((len(startxy), rasternumpy.shape[0], rasternumpy.shape[1])).astype(float)
+
+    i = 0
+    rrast = arcpy.sa.Raster(inraster)
+    arcpy.env.extent = rrast.extent  # Very important!
+    arcpy.env.snapRaster = rrast  # Very important!
+    instreamslyr = 'strlyr'
+    arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
+    for row in arcpy.SearchCursor(instreams):
+        id = row.getValue('OBJECTID')
+        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"OBJECTID" = ' + str(id))
+        euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
+        eucs[i,:,:] = arcpy.RasterToNumPyArray(euc)
+        i = i + 1
+
     # Tracing stream lines
     arcpy.AddMessage("Searching for closest stream lines...")
-    newrasternumpy = process_raster(rasternumpy, minacc, radius, startxy, endxy, lowerleft.X, lowerleft.Y, cellsize)
+    newrasternumpy = process_raster(rasternumpy, eucs, minacc, radius, startxy, endxy, lowerleft.X, lowerleft.Y, cellsize)
 
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
     outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, value_to_nodata=0))
     arcpy.DefineProjection_management(outinnerraster, crs)
-    # outinnerraster.save(outraster)
+    outinnerraster.save(outstreams + '_R')
 
     arcpy.RasterToPolyline_conversion(outinnerraster, outstreams, simplify='NO_SIMPLIFY')
 
