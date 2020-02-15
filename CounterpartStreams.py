@@ -72,61 +72,12 @@ def find_cell(accraster, i, j, Down = True):
     else:
         return find_up_cell(accraster, i, j)
 
-def trace_flow_cells(accraster, euc, i, j, minacc, neigh, down = True):
-    acc = accraster[i, j]
-    ik = i
-    jk = j
-    n = 0
-    stream = []
-    selcells = []
-    seln = []
-    e = []
-    inside = False
-
-    try:
-        if acc >= minacc:
-            while True:
-                current = (ik, jk)
-
-                if current in neigh:
-                    selcells.append(neigh.index(current))
-                    seln.append(n)
-                    inside = True
-                elif inside: # we previously get into the neighborhood
-                    break
-
-                stream.append(current)
-                e.append(euc[ik, jk])
-
-                inext, jnext = find_cell(accraster, ik, jk, down)
-
-                if inext == ik and jnext == jk:
-                    break
-
-                ik = inext
-                jk = jnext
-                n += 1
-
-            if len(selcells) > 0:
-                end = seln[numpy.argsort(selcells)[0]] + 1
-                return stream[0:end], e[0:end]
-            else: return [], []
-        else: return [], []
-
-    except:
-        tb = sys.exc_info()[2]
-        tbinfo = traceback.format_tb(tb)[0]
-        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
-                str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
-        arcpy.AddError(pymsg)
-        raise Exception
-
 def extend_array(array, nx, ny, value):
-    
+
     ni = array.shape[0]
     nj = array.shape[1]
 
-    extarray = numpy.empty((ni+ny, nj+nx))
+    extarray = numpy.empty((ni + ny, nj + nx))
     extarray.fill(value)
     for i in range(ni):
         for j in range(nj):
@@ -154,6 +105,70 @@ def get_neighborhood(i, j, radius, cellsize, ni, nj):
     neigh = list(map(lambda a, b: (a, b), x[order], y[order]))
 
     return neigh
+
+def cell_distance(cell1, cell2):
+    return math.sqrt((cell1[0] - cell2[0])**2 + (cell1[1] - cell2[1])**2)
+
+def path_length(path):
+    L = 0
+    n = len(path)
+    (ic, jc) = path[0]
+    for k in range(1, n):
+        (i, j) = path[k]
+        L += cell_distance((i,j), (ic,jc))
+        ic = i
+        jc = j
+    return L
+
+
+def trace_flow_cells(accraster, euc, i, j, minacc, endneigh, down = True):
+    acc = accraster[i, j]
+    ik = i
+    jk = j
+    n = 0
+    stream = []
+    endcells = []
+    endn = []
+    e = []
+    in_end = False
+
+    try:
+        if acc >= minacc:
+            while True:
+                current = (ik, jk)
+
+                if current in endneigh:
+                    endcells.append(endneigh.index(current))
+                    endn.append(n)
+                    in_end = True
+                elif in_end: # we previously get into the neighborhood
+                    break
+
+                stream.append(current)
+                e.append(euc[ik, jk])
+
+                inext, jnext = find_cell(accraster, ik, jk, down)
+
+                if inext == ik and jnext == jk:
+                    break
+
+                ik = inext
+                jk = jnext
+                n += 1
+
+            if len(endcells) > 0:
+                end = endn[numpy.argsort(endcells)[0]] + 1
+                return stream[0:end], e[0:end]
+            else: return [], []
+        else: return [], []
+
+    except:
+        tb = sys.exc_info()[2]
+        tbinfo = traceback.format_tb(tb)[0]
+        pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
+        arcpy.AddError(pymsg)
+        raise Exception
 
 def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, cellsize):
 
@@ -187,9 +202,26 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
             for (i, j) in startneigh:
                 if  inraster[i, j] > minacc:
                     s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
-                    l = len(e)
-                    if l > 0 :
-                        w = sum(e)/l
+                    ncells = len(e)
+
+                    if ncells > 0:
+                        l = 0
+                        cur = s[l]
+                        startstream = []
+                        while cur in startneigh:
+                            startstream.append(cur)
+                            l += 1
+                            if (l < ncells):
+                                cur = s[l]
+                            else: break
+
+                        nstart = l-1
+
+                        L = path_length(startstream) + 1
+
+                        E = sum(e[0:nstart]) / (cellsize * L)
+                        D = cell_distance((i, j), startneigh[0]) / L
+                        w = math.sqrt(E + 1) * (D + 1)
                         if w < weight:
                             stream = s
                             weight = w
@@ -201,8 +233,8 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
         streams.sort(key = len)
 
         for k in range(n):
-            for l in range(len(streams[k])):
-                outraster[streams[k][l][0], streams[k][l][1]] = k + 1
+            for ncells in range(len(streams[k])):
+                outraster[streams[k][ncells][0], streams[k][ncells][1]] = k + 1
 
         return outraster
     except:
