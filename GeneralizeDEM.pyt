@@ -190,6 +190,16 @@ class TraceCounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
+        in_field = arcpy.Parameter(
+            displayName="Hydrographic line ID field",
+            name="in_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        in_field.filter.list = ['Short', 'Long']
+        in_field.parameterDependencies = [in_streams.name]
+
         in_raster = arcpy.Parameter(
             displayName="Input flow accumulation raster",
             name="in_raster",
@@ -211,6 +221,8 @@ class TraceCounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
+        min_acc.value = 1
+
         radius = arcpy.Parameter(
             displayName="Catch radius",
             name="radius",
@@ -218,7 +230,7 @@ class TraceCounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_raster, out_streams, min_acc, radius]
+        params = [in_streams, in_field, in_raster, out_streams, min_acc, radius]
         return params
 
     def isLicensed(self):
@@ -233,12 +245,13 @@ class TraceCounterpartStreams(object):
     def execute(self, parameters, messages):
 
         instreams = parameters[0].valueAsText
-        inraster = parameters[1].valueAsText
-        outstreams = parameters[2].valueAsText
-        minacc = float(parameters[3].valueAsText)
-        radius = int(parameters[4].valueAsText)
+        inidfield= parameters[1].valueAsText
+        inraster = parameters[2].valueAsText
+        outstreams = parameters[3].valueAsText
+        minacc = float(parameters[4].valueAsText)
+        radius = int(parameters[5].valueAsText)
 
-        CS.execute(instreams, inraster, outstreams, minacc, radius)
+        CS.execute(instreams, inidfield, inraster, outstreams, minacc, radius)
 
         return
 

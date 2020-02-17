@@ -170,7 +170,7 @@ def trace_flow_cells(accraster, euc, i, j, minacc, endneigh, down = True):
         arcpy.AddError(pymsg)
         raise Exception
 
-def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, cellsize):
+def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, miny, cellsize):
 
     try:
         global MAXACC
@@ -178,7 +178,9 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
         nj = inraster.shape[1]
         n = len(startxy)
 
-        outraster = numpy.zeros((ni, nj))
+        nodatavalue = 0 if (min(ids) > 0) else min(ids) - 1
+
+        outraster = numpy.full((ni, nj), nodatavalue)
         extinraster = extend_array(inraster, 1, 1, 0)
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
@@ -225,6 +227,7 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
                         if w < weight:
                             stream = s
                             weight = w
+
             streams.append(stream)
             
             arcpy.SetProgressorPosition(k)
@@ -234,9 +237,9 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
 
         for k in range(n):
             for ncells in range(len(streams[k])):
-                outraster[streams[k][ncells][0], streams[k][ncells][1]] = k + 1
+                outraster[streams[k][ncells][0], streams[k][ncells][1]] = ids[k]
 
-        return outraster
+        return outraster, nodatavalue
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
@@ -245,7 +248,7 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, minx, miny, c
         arcpy.AddError(pymsg)
         raise Exception
 
-def execute(instreams, inraster, outstreams, minacc, radius):
+def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -280,34 +283,37 @@ def execute(instreams, inraster, outstreams, minacc, radius):
     arcpy.env.snapRaster = rrast  # Very important!
     instreamslyr = 'strlyr'
     arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
+    ids = []
     for row in arcpy.SearchCursor(instreams):
-        id = row.getValue('OBJECTID')
-        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"OBJECTID" = ' + str(id))
+        id = row.getValue(inIDfield)
+        ids.append(id)
+        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"' + inIDfield + '" = ' + str(id))
         euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
         eucs[i,:,:] = arcpy.RasterToNumPyArray(euc)
         i = i + 1
 
     # Tracing stream lines
     arcpy.AddMessage("Searching for closest stream lines...")
-    newrasternumpy = process_raster(rasternumpy, eucs, minacc, radius, startxy, endxy, lowerleft.X, lowerleft.Y, cellsize)
+    newrasternumpy, nodatavalue = process_raster(rasternumpy, eucs, minacc, radius, startxy, endxy, ids, lowerleft.X, lowerleft.Y, cellsize)
 
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
-    outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, value_to_nodata=0))
+    outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, value_to_nodata = nodatavalue))
     arcpy.DefineProjection_management(outinnerraster, crs)
     outinnerraster.save(outstreams + '_R')
 
-    arcpy.RasterToPolyline_conversion(outinnerraster, outstreams, simplify='NO_SIMPLIFY')
+    arcpy.RasterToPolyline_conversion(outinnerraster, outstreams, background_value='NODATA', simplify='NO_SIMPLIFY')
 
 if __name__ == "__main__":
     try:
         inStreams = arcpy.GetParameterAsText(0)
-        inRaster = arcpy.GetParameterAsText(1)
-        outStreams = arcpy.GetParameterAsText(2)
-        minAcc = float(arcpy.GetParameterAsText(3))
-        radius = float(arcpy.GetParameterAsText(4))
+        inIDfield = arcpy.GetParameterAsText(1)
+        inRaster = arcpy.GetParameterAsText(2)
+        outStreams = arcpy.GetParameterAsText(3)
+        minAcc = float(arcpy.GetParameterAsText(4))
+        radius = float(arcpy.GetParameterAsText(5))
 
-        execute(inStreams, inRaster, outStreams, minAcc, radius)
+        execute(inStreams, inIDfield, inRaster, outStreams, minAcc, radius)
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
