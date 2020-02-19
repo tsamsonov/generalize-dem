@@ -354,8 +354,9 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
 
                 if arcpy.sa.IsNull(costpath).minimum == 0:
                     costlines = 'in_memory/costlines'
-                    arcpy.RasterToPolyline_conversion(costpath * id, costlines, background_value='NODATA',
+                    arcpy.RasterToPolyline_conversion(costpath + 1, costlines, background_value='NODATA',
                                                       simplify='NO_SIMPLIFY')
+                    arcpy.CalculateField_management(costlines, 'grid_code', id)
                     arcpy.Append_management(costlines, result, schema_type = 'NO_TEST')
 
             i += 1
