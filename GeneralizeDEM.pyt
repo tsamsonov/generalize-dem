@@ -7,7 +7,9 @@ import arcpy
 import traceback
 
 import FilterDEM as FD
+import FrechetLinks as FL
 import CreateFishnet as CF
+import ConflateDEM as CD
 import GeneralizeDEM as GD
 import ExtractStreams as ES
 import CounterpartStreams as CS
@@ -21,7 +23,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, TraceCounterpartStreams, FilterDEM, WidenLandforms, GeneralizeDEM]
+        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, FrechetLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEM]
 
 class CreateFishnet(object):
 
@@ -173,7 +175,7 @@ class ExtractStreams(object):
 
         return
 
-class TraceCounterpartStreams(object):
+class CounterpartStreams(object):
 
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
@@ -255,7 +257,6 @@ class TraceCounterpartStreams(object):
 
         return
 
-
 class FilterDEM(object):
 
     def __init__(self):
@@ -333,7 +334,6 @@ class FilterDEM(object):
                     str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
             arcpy.AddError(pymsg)
         return
-
 
 class WidenLandforms(object):
     def __init__(self):
@@ -421,6 +421,155 @@ class WidenLandforms(object):
 
         return
 
+class ConflateDEM(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Conflate DEM"
+        self.description = ""
+        self.canRunInBackground = True
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+        inraster = arcpy.Parameter(
+            displayName="Input raster DEM",
+            name="inraster",
+            datatype="GPRasterLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_streams = arcpy.Parameter(
+            displayName="Input reference hydrographic lines",
+            name="in_streams",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_field = arcpy.Parameter(
+            displayName="Hydrographic line ID field",
+            name="in_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        in_field.filter.list = ['Short', 'Long']
+        in_field.parameterDependencies = [in_streams.name]
+
+        outraster = arcpy.Parameter(
+            displayName="Output raster DEM",
+            name="outraster",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Output")
+
+        min_acc = arcpy.Parameter(
+            displayName="Minimum flow accumulation",
+            name="min_acc",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        min_acc.value = 1
+
+        radius = arcpy.Parameter(
+            displayName="Catch radius (in DEM projection units)",
+            name="radius",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        params = [inraster, in_streams, in_field, outraster, min_acc, radius]
+        return params
+
+    def isLicensed(self):
+
+        return True  # tool can be executed
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+
+        inraster = parameters[0].valueAsText
+        hydrolines = parameters[1].valueAsText
+        inidfield = parameters[2].valueAsText
+        outraster = parameters[3].valueAsText
+        minacc = float(parameters[4].valueAsText)
+        radius = float(parameters[5].valueAsText)
+
+        CD.execute(inraster, hydrolines, inidfield, outraster, minacc, radius)
+
+        return
+
+class FrechetLinks(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Generate Frechet Links"
+        self.description = ""
+        self.canRunInBackground = True
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+
+        in_hydrolines = arcpy.Parameter(
+            displayName="Input reference hydrographic lines",
+            name="in_hydrolines",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        hydro_field = arcpy.Parameter(
+            displayName="Hydrographic line ID field",
+            name="hydro_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        hydro_field.filter.list = ['Short', 'Long']
+        hydro_field.parameterDependencies = [in_hydrolines.name]
+
+        in_counterparts = arcpy.Parameter(
+            displayName="Input counterpart streams",
+            name="in_counterparts",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        count_field = arcpy.Parameter(
+            displayName="Couinterpart line ID field",
+            name="count_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        count_field.filter.list = ['Short', 'Long']
+        count_field.parameterDependencies = [in_counterparts.name]
+
+        params = [in_hydrolines, hydro_field, in_counterparts, count_field]
+        return params
+
+    def isLicensed(self):
+
+        return True  # tool can be executed
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+
+        in_hydrolines = parameters[0].valueAsText
+        hydro_field = parameters[1].valueAsText
+        in_counterparts = parameters[2].valueAsText
+        count_field = parameters[3].valueAsText
+
+        FL.execute(in_hydrolines, hydro_field, in_counterparts, count_field)
+
+        return
 
 class GeneralizeDEM(object):
     def __init__(self):
