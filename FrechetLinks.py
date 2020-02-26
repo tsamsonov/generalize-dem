@@ -11,27 +11,7 @@ from scipy.spatial.distance import cdist
 def euc_dist(p1, p2):
     return math.sqrt((p2[0] - p1[0]) * (p2[0] - p1[0]) + (p2[1] - p1[1]) * (p2[1] - p1[1]))
 
-def _c(ca, i, j, P, Q):
-    if ca[i,j] > -1:
-        return ca[i,j]
-    elif i == 0 and j == 0:
-        ca[i,j] = euc_dist(P[0],Q[0])
-    elif i > 0 and j == 0:
-        ca[i,j] = max(_c(ca,i-1,0,P,Q),euc_dist(P[i],Q[0]))
-    elif i == 0 and j > 0:
-        ca[i,j] = max(_c(ca,0,j-1,P,Q),euc_dist(P[0],Q[j]))
-    elif i > 0 and j > 0:
-        ca[i,j] = max(min(_c(ca,i-1,j,P,Q),_c(ca,i-1,j-1,P,Q),_c(ca,i,j-1,P,Q)),euc_dist(P[i],Q[j]))
-    else:
-        ca[i,j] = float("inf")
-    return ca[i,j]
-
 def frechet_dist(P,Q):
-    ca = numpy.full((len(P),len(Q)), -1)
-
-    return _c(ca, len(P)-1, len(Q)-1, P, Q)
-
-def frechet_matrix(P,Q):
     n = len(P)
     m = len(Q)
     ca = numpy.full((n, m), -1)
@@ -48,7 +28,7 @@ def frechet_matrix(P,Q):
                                ca[i, j - 1],
                                ca[i - 1, j - 1]),
                            euc_dist(P[i], Q[j]))
-    return ca
+    return ca[n-1, m-1]
 
 def euc_matrix(P, Q):
     mdist = cdist(P, Q, 'euclidean')
@@ -73,16 +53,12 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
         for pnt in counterpart[0].getPart().next():
             count_coords.append([pnt.X, pnt.Y])
 
-        # fmatrix = frechet_matrix(hydro_coords, count_coords)
-
         eucs = euc_matrix(count_coords, hydro_coords)
 
         ni = len(count_coords)
-        nj = len(hydro_coords)
 
         minjays = []
 
-        MAX = numpy.amax(eucs) + 1
         for i in range(ni):
             minj = numpy.argmin(eucs[i, :])
             for k in range (i, ni):
@@ -92,8 +68,6 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
             minjays.append(minj)
 
         pairs = zip(range(ni), minjays)
-
-
 
         # pairs = [[0, 0]]
         #
@@ -143,8 +117,8 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
         #         j += 1
         #     np += 1
 
-        arcpy.AddMessage('Pairs: ' + str(pairs))
-
+        fdist = frechet_dist(count_coords, hydro_coords)
+        arcpy.AddMessage('Frechet distance: ' + str(fdist) + ' (' + hydro_field + ' = ' + str(id) + ')')
 
         for pair in pairs:
             line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
