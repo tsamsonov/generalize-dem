@@ -54,9 +54,11 @@ def euc_matrix(P, Q):
     mdist = cdist(P, Q, 'euclidean')
     return mdist
 
-def execute(in_hydrolines, hydro_field, in_counterparts, count_field):
+def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links):
 
     hcursor = arcpy.da.SearchCursor(in_hydrolines, ['SHAPE@', hydro_field])
+
+    features = []
 
     for row in hcursor:
         hydro_coords = []
@@ -73,15 +75,87 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field):
 
         # fmatrix = frechet_matrix(hydro_coords, count_coords)
 
-        eucs = euc_matrix(hydro_coords, count_coords)
+        eucs = euc_matrix(count_coords, hydro_coords)
 
-        nb_forward = numpy.argmin(eucs, 0)
-        nb_back = numpy.argmin(eucs, 1)
+        ni = len(count_coords)
+        nj = len(hydro_coords)
 
-        arcpy.AddMessage('FORWARD: ' + str(nb_forward))
-        arcpy.AddMessage('BACK: ' + str(nb_back))
+        minjays = []
 
-        # arcpy.AddMessage('Last euc distance: ' + str(eucs[-1, -1]))
+        MAX = numpy.amax(eucs) + 1
+        for i in range(ni):
+            minj = numpy.argmin(eucs[i, :])
+            for k in range (i, ni):
+                curj = numpy.argmin(eucs[k, :])
+                if  minj > curj:
+                    minj = curj
+            minjays.append(minj)
+
+        pairs = zip(range(ni), minjays)
+
+
+
+        # pairs = [[0, 0]]
+        #
+        # i = 0
+        # j = 0
+        #
+        # np = 1
+        #
+        # while i < ni - 1 or j < nj - 1:
+        #     if j == nj - 1:
+        #         pairs.append([i + 1, j])
+        #         i += 1
+        #     elif i == ni - 1:
+        #         pairs.append([i, j + 1])
+        #         j += 1
+        #     elif eucs[i + 1, j] < eucs[i, j + 1] and eucs[i + 1, j] < eucs[i + 1, j + 1]:
+        #         if np > 1:
+        #             if pairs[-2][0] == pairs[-1][0] and pairs[-2][1] != pairs[-1][1]:
+        #                 pairs = pairs[:-1]
+        #                 np -= 1
+        #                 pairs.append([i + 1, j + 1])
+        #                 i += 1
+        #                 j += 1
+        #             else:
+        #                 pairs.append([i + 1, j])
+        #                 i += 1
+        #         else:
+        #             pairs.append([i + 1, j])
+        #             i += 1
+        #     elif eucs[i, j + 1] < eucs[i + 1, j] and eucs[i, j + 1] < eucs[i + 1, j + 1]:
+        #         if np > 1:
+        #             if pairs[-2][0] != pairs[-1][0] and pairs[-2][1] == pairs[-1][1]:
+        #                 pairs = pairs[:-1]
+        #                 np -= 1
+        #                 pairs.append([i + 1, j + 1])
+        #                 i += 1
+        #                 j += 1
+        #             else:
+        #                 pairs.append([i, j + 1])
+        #                 j += 1
+        #         else:
+        #             pairs.append([i, j + 1])
+        #             j += 1
+        #     else:
+        #         pairs.append([i + 1, j + 1])
+        #         i += 1
+        #         j += 1
+        #     np += 1
+
+        arcpy.AddMessage('Pairs: ' + str(pairs))
+
+
+        for pair in pairs:
+            line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
+            features.append(arcpy.Polyline(arcpy.Array(line)))
+
+    arcpy.CreateFeatureclass_management(os.path.dirname(out_links), os.path.basename(out_links),
+                                        geometry_type = 'POLYLINE', spatial_reference = in_hydrolines)
+
+    cursor = arcpy.da.InsertCursor(out_links, ["SHAPE@"])
+    for feature in features:
+        cursor.insertRow([feature])
 
     return
 
@@ -90,9 +164,10 @@ if __name__ == 'main':
     hydro_field = arcpy.GetParameterAsText(1)
     in_counterparts = int(arcpy.GetParameterAsText(2))
     count_field = int(arcpy.GetParameterAsText(3))
+    out_links = arcpy.GetParameterAsText(4)
 
     try:
-        execute(in_hydrolines, hydro_field, in_counterparts, count_field)
+        execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
 
     except:
         tb = sys.exc_info()[2]

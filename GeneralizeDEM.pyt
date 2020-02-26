@@ -547,7 +547,14 @@ class FrechetLinks(object):
         count_field.filter.list = ['Short', 'Long']
         count_field.parameterDependencies = [in_counterparts.name]
 
-        params = [in_hydrolines, hydro_field, in_counterparts, count_field]
+        out_links = arcpy.Parameter(
+            displayName="Output rubbersheet links",
+            name="out_links",
+            datatype="DEFeatureClass",
+            parameterType="Required",
+            direction="Output")
+
+        params = [in_hydrolines, hydro_field, in_counterparts, count_field, out_links]
         return params
 
     def isLicensed(self):
@@ -566,8 +573,9 @@ class FrechetLinks(object):
         hydro_field = parameters[1].valueAsText
         in_counterparts = parameters[2].valueAsText
         count_field = parameters[3].valueAsText
+        out_links = parameters[4].valueAsText
 
-        FL.execute(in_hydrolines, hydro_field, in_counterparts, count_field)
+        FL.execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
 
         return
 
