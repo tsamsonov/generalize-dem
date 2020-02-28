@@ -80,6 +80,18 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
                     jbacks.append(j)
                     ibacks.append(iback)
             curj = nextj
+
+        # check if the last points are connected
+        if nj-1 not in minjays:
+            for j in range(curj + 1, nj):
+                jbacks.append(j)
+                ibacks.append(ni-1)
+
+        # check if the first points are connected
+        if 0 not in minjays:
+            ibacks.insert(0, 0)
+            jbacks.insert(0, 0)
+
         pairs = zip(range(ni), minjays)
         backpairs = zip(ibacks, jbacks)
 
