@@ -56,9 +56,10 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
         eucs = euc_matrix(count_coords, hydro_coords)
 
         ni = len(count_coords)
+        nj = len(hydro_coords)
 
+        # find basic min j for each i
         minjays = []
-
         for i in range(ni):
             minj = numpy.argmin(eucs[i, :])
             for k in range (i, ni):
@@ -67,7 +68,20 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
                     minj = curj
             minjays.append(minj)
 
+        # fill empty min j by connecting to nearest i
+        jbacks = []
+        ibacks = []
+        curj = 0
+        for i in range(1, ni-1):
+            nextj = minjays[i]
+            if nextj - curj > 1:
+                for j in range(curj+1, nextj):
+                    iback = numpy.argmin(eucs[(i-1):(i+1), j]) + i - 1
+                    jbacks.append(j)
+                    ibacks.append(iback)
+            curj = nextj
         pairs = zip(range(ni), minjays)
+        backpairs = zip(ibacks, jbacks)
 
         # pairs = [[0, 0]]
         #
@@ -121,6 +135,10 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
         arcpy.AddMessage('Frechet distance: ' + str(fdist) + ' (' + hydro_field + ' = ' + str(id) + ')')
 
         for pair in pairs:
+            line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
+            features.append(arcpy.Polyline(arcpy.Array(line)))
+
+        for pair in backpairs:
             line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
             features.append(arcpy.Polyline(arcpy.Array(line)))
 
