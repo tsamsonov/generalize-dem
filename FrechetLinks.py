@@ -36,10 +36,15 @@ def euc_matrix(P, Q):
 
 def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links):
 
+    arcpy.CreateFeatureclass_management(os.path.dirname(out_links), os.path.basename(out_links),
+                                        geometry_type='POLYLINE', spatial_reference=in_hydrolines)
+
+    arcpy.AddField_management(out_links, 'ID', 'LONG')
+    arcpy.AddField_management(out_links, 'DIR', 'TEXT', field_length=8)
+
+    insertcursor = arcpy.da.InsertCursor(out_links, ['SHAPE@', 'ID', 'DIR'])
+
     hcursor = arcpy.da.SearchCursor(in_hydrolines, ['SHAPE@', hydro_field])
-
-    features = []
-
     for row in hcursor:
         hydro_coords = []
         for pnt in row[0].getPart().next():
@@ -146,20 +151,21 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
         fdist = frechet_dist(count_coords, hydro_coords)
         arcpy.AddMessage('Frechet distance: ' + str(fdist) + ' (' + hydro_field + ' = ' + str(id) + ')')
 
+        features = []
         for pair in pairs:
             line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
             features.append(arcpy.Polyline(arcpy.Array(line)))
 
+        backfeatures = []
         for pair in backpairs:
             line = [arcpy.Point(*count_coords[pair[0]]), arcpy.Point(*hydro_coords[pair[1]])]
-            features.append(arcpy.Polyline(arcpy.Array(line)))
+            backfeatures.append(arcpy.Polyline(arcpy.Array(line)))
 
-    arcpy.CreateFeatureclass_management(os.path.dirname(out_links), os.path.basename(out_links),
-                                        geometry_type = 'POLYLINE', spatial_reference = in_hydrolines)
-
-    cursor = arcpy.da.InsertCursor(out_links, ["SHAPE@"])
-    for feature in features:
-        cursor.insertRow([feature])
+        for feature in features:
+            insertcursor.insertRow([feature, id, 'Forward'])
+            
+        for backfeature in backfeatures:
+            insertcursor.insertRow([backfeature, id, 'Backward'])
 
     return
 
