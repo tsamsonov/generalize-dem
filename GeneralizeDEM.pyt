@@ -7,7 +7,7 @@ import arcpy
 import traceback
 
 import FilterDEM as FD
-import FrechetLinks as FL
+import ConflationLinks as CL
 import CreateFishnet as CF
 import ConflateDEM as CD
 import GeneralizeDEM as GD
@@ -23,7 +23,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, FrechetLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEM]
+        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEM]
 
 class CreateFishnet(object):
 
@@ -503,10 +503,10 @@ class ConflateDEM(object):
 
         return
 
-class FrechetLinks(object):
+class GenerateConflationLinks(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Generate Frechet Links"
+        self.label = "Generate Conflation Links"
         self.description = ""
         self.canRunInBackground = True
 
@@ -548,13 +548,20 @@ class FrechetLinks(object):
         count_field.parameterDependencies = [in_counterparts.name]
 
         out_links = arcpy.Parameter(
-            displayName="Output rubbersheet links",
+            displayName="Output conflation links",
             name="out_links",
             datatype="DEFeatureClass",
             parameterType="Required",
             direction="Output")
 
-        params = [in_hydrolines, hydro_field, in_counterparts, count_field, out_links]
+        out_area = arcpy.Parameter(
+            displayName="Output conflation area",
+            name="out_area",
+            datatype="DEFeatureClass",
+            parameterType="Optional",
+            direction="Output")
+
+        params = [in_hydrolines, hydro_field, in_counterparts, count_field, out_links, out_area]
         return params
 
     def isLicensed(self):
@@ -574,8 +581,9 @@ class FrechetLinks(object):
         in_counterparts = parameters[2].valueAsText
         count_field = parameters[3].valueAsText
         out_links = parameters[4].valueAsText
+        out_area = parameters[5].valueAsText
 
-        FL.execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
+        CL.execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links, out_area)
 
         return
 

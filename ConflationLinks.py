@@ -34,7 +34,7 @@ def euc_matrix(P, Q):
     mdist = cdist(P, Q, 'euclidean')
     return mdist
 
-def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links):
+def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links, out_area):
 
     arcpy.CreateFeatureclass_management(os.path.dirname(out_links), os.path.basename(out_links),
                                         geometry_type='POLYLINE', spatial_reference=in_hydrolines)
@@ -163,9 +163,14 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
 
         for feature in features:
             insertcursor.insertRow([feature, id, 'Forward'])
-            
+
         for backfeature in backfeatures:
             insertcursor.insertRow([backfeature, id, 'Backward'])
+
+    if out_area is not None:
+        polys = 'in_memory/polys'
+        arcpy.FeatureToPolygon_management([in_hydrolines, in_counterparts, out_links], polys)
+        arcpy.Dissolve_management(polys, out_area)
 
     return
 
@@ -175,9 +180,10 @@ if __name__ == 'main':
     in_counterparts = int(arcpy.GetParameterAsText(2))
     count_field = int(arcpy.GetParameterAsText(3))
     out_links = arcpy.GetParameterAsText(4)
+    out_area = arcpy.GetParameterAsText(5)
 
     try:
-        execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links)
+        execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links, out_area)
 
     except:
         tb = sys.exc_info()[2]
