@@ -9,7 +9,7 @@ import traceback
 import FilterDEM as FD
 import ConflationLinks as CL
 import CreateFishnet as CF
-import ConflateDEM as CD
+import ConflateDEMbyLinks as CB
 import GeneralizeDEM as GD
 import ExtractStreams as ES
 import CounterpartStreams as CS
@@ -23,7 +23,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEM]
+        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
 
 class CreateFishnet(object):
 
@@ -421,63 +421,51 @@ class WidenLandforms(object):
 
         return
 
-class ConflateDEM(object):
+class ConflateDEMbyLinks(object):
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Conflate DEM"
+        self.label = "Conflate DEM by Links"
         self.description = ""
         self.canRunInBackground = True
 
     def getParameterInfo(self):
         """Define parameter definitions"""
-        inraster = arcpy.Parameter(
+        in_raster = arcpy.Parameter(
             displayName="Input raster DEM",
-            name="inraster",
+            name="in_raster",
             datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
 
-        in_streams = arcpy.Parameter(
-            displayName="Input reference hydrographic lines",
-            name="in_streams",
+        in_links = arcpy.Parameter(
+            displayName="Input conflation links",
+            name="in_links",
             datatype="GPFeatureLayer",
             parameterType="Required",
             direction="Input")
 
-        in_field = arcpy.Parameter(
-            displayName="Hydrographic line ID field",
-            name="in_field",
-            datatype="Field",
+        in_area = arcpy.Parameter(
+            displayName="Input conflation area",
+            name="in_area",
+            datatype="GPFeatureLayer",
             parameterType="Required",
             direction="Input")
 
-        in_field.filter.list = ['Short', 'Long']
-        in_field.parameterDependencies = [in_streams.name]
+        distance = arcpy.Parameter(
+            displayName="Conflation distance",
+            name="distance",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
 
-        outraster = arcpy.Parameter(
+        out_raster = arcpy.Parameter(
             displayName="Output raster DEM",
-            name="outraster",
+            name="out_raster",
             datatype="DERasterDataset",
             parameterType="Required",
             direction="Output")
 
-        min_acc = arcpy.Parameter(
-            displayName="Minimum flow accumulation",
-            name="min_acc",
-            datatype="GPDouble",
-            parameterType="Required",
-            direction="Input")
-
-        min_acc.value = 1
-
-        radius = arcpy.Parameter(
-            displayName="Catch radius (in DEM projection units)",
-            name="radius",
-            datatype="GPDouble",
-            parameterType="Required",
-            direction="Input")
-
-        params = [inraster, in_streams, in_field, outraster, min_acc, radius]
+        params = [in_raster, in_links, in_area, distance, out_raster]
         return params
 
     def isLicensed(self):
@@ -492,14 +480,13 @@ class ConflateDEM(object):
 
     def execute(self, parameters, messages):
 
-        inraster = parameters[0].valueAsText
-        hydrolines = parameters[1].valueAsText
-        inidfield = parameters[2].valueAsText
-        outraster = parameters[3].valueAsText
-        minacc = float(parameters[4].valueAsText)
-        radius = float(parameters[5].valueAsText)
+        in_raster = parameters[0].valueAsText
+        in_links = parameters[1].valueAsText
+        in_area = parameters[2].valueAsText
+        distance = float(parameters[3].valueAsText)
+        out_raster = parameters[4].valueAsText
 
-        CD.execute(inraster, hydrolines, inidfield, outraster, minacc, radius)
+        CB.execute(in_raster, in_links, in_area, distance, out_raster)
 
         return
 

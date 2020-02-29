@@ -332,6 +332,8 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
             id = row.getValue(inIDfield)
             if id in failed:
 
+                arcpy.AddMessage("ID =  " + str(id))
+
                 arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
                                                         '"' + inIDfield + '" = ' + str(id))
                 arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
