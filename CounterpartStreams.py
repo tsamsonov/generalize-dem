@@ -265,7 +265,7 @@ def FlipLine(Line):
     OutShape = arcpy.Polyline(rPnts)
     return OutShape
 
-def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, radius, deviation):
+def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -378,7 +378,9 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, radi
                 euc = arcpy.NumPyArrayToRaster(eucs[i,:,:], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
-                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value", arcpy.sa.RemapRange([[0,deviation, 100000],[deviation,euc.maximum,'NODATA']]))
+                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
+                                                           arcpy.sa.RemapRange([[0, deviation, penalty],
+                                                                                [deviation,euc.maximum,'NODATA']]))
 
                 strs = arcpy.sa.Reclassify(inraster, "value", arcpy.sa.RemapRange([[0,minacc,'NODATA'],[minacc,MAXACC,1]]))
 
@@ -434,10 +436,11 @@ if __name__ == "__main__":
         demRaster = arcpy.GetParameterAsText(3)
         outStreams = arcpy.GetParameterAsText(4)
         minAcc = float(arcpy.GetParameterAsText(5))
-        radius = float(arcpy.GetParameterAsText(6))
-        deviation = float(arcpy.GetParameterAsText(7))
+        penalty = int(arcpy.GetParameterAsText(6))
+        radius = float(arcpy.GetParameterAsText(7))
+        deviation = float(arcpy.GetParameterAsText(8))
 
-        execute(inStreams, inIDfield, inRaster, demRaster, outStreams, minAcc, radius, deviation)
+        execute(inStreams, inIDfield, inRaster, demRaster, outStreams, minAcc, penalty, radius, deviation)
 
     except:
         tb = sys.exc_info()[2]

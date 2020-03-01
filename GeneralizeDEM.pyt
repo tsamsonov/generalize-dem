@@ -230,7 +230,16 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        min_acc.value = 1
+        min_acc.value = 10
+
+        penalty = arcpy.Parameter(
+            displayName="Offstream penalty",
+            name="penalty",
+            datatype="GPLong",
+            parameterType="Required",
+            direction="Input")
+
+        penalty.value = 30
 
         radius = arcpy.Parameter(
             displayName="Catch radius",
@@ -246,7 +255,7 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_field, in_raster, dem_raster, out_streams, min_acc, radius, deviation]
+        params = [in_streams, in_field, in_raster, dem_raster, out_streams, min_acc, penalty, radius, deviation]
         return params
 
     def isLicensed(self):
@@ -266,10 +275,11 @@ class CounterpartStreams(object):
         demraster = parameters[3].valueAsText
         outstreams = parameters[4].valueAsText
         minacc = float(parameters[5].valueAsText)
-        radius = float(parameters[6].valueAsText)
-        deviation = float(parameters[7].valueAsText)
+        penalty = int(parameters[6].valueAsText)
+        radius = float(parameters[7].valueAsText)
+        deviation = float(parameters[8].valueAsText)
 
-        CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, radius, deviation)
+        CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, penalty, radius, deviation)
 
         return
 
