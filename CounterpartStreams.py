@@ -178,9 +178,6 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, mi
         nj = inraster.shape[1]
         n = len(startxy)
 
-        nodatavalue = 0 if (min(ids) > 0) else min(ids) - 1
-
-        outraster = numpy.full((ni, nj), nodatavalue)
         extinraster = extend_array(inraster, 1, 1, 0)
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
@@ -239,11 +236,19 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, mi
 
             arcpy.SetProgressorPosition(k)
 
-        for l in range(len(streams)):
-            for ncells in range(len(streams[l])):
-                outraster[streams[l][ncells][0], streams[l][ncells][1]] = succeeded[l]
+        outraster = None
+        nodatavalue = 0 if (min(ids) > 0) else min(ids) - 1
+        N = len(streams)
+
+        if (N > 0):
+            outraster = numpy.full((N, ni, nj), nodatavalue)
+
+            for l in range(N):
+                for ncells in range(len(streams[l])):
+                    outraster[l, streams[l][ncells][0], streams[l][ncells][1]] = succeeded[l]
 
         return outraster, nodatavalue, failed
+
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]
@@ -252,7 +257,7 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, mi
         arcpy.AddError(pymsg)
         raise Exception
 
-def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
+def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -262,10 +267,17 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
 
     rasternumpy = arcpy.RasterToNumPyArray(inraster, nodata_to_value = MAXACC + 1)
 
+    domain = 'in_memory/domain'
+    arcpy.RasterDomain_3d(inraster, domain, 'POLYGON')
+
+    instreams_crop = 'in_memory/str_cropped'
+    arcpy.Clip_analysis(in_streams, domain, instreams_crop)
+
     startpts = 'in_memory/startpts'
     endpts = 'in_memory/endpts'
 
-    arcpy.FeatureVerticesToPoints_management(instreams, startpts, point_location='START')
+
+    arcpy.FeatureVerticesToPoints_management(instreams_crop, startpts, point_location='START')
     startxy = []
     startID = []
     for row in arcpy.da.SearchCursor(startpts, ["SHAPE@XY", inIDfield]):
@@ -274,7 +286,7 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
         startID.append(row[1])
 
 
-    arcpy.FeatureVerticesToPoints_management(instreams, endpts, point_location = 'END')
+    arcpy.FeatureVerticesToPoints_management(instreams_crop, endpts, point_location = 'END')
     endxy = []
     endID = []
     for row in arcpy.da.SearchCursor(endpts, ["SHAPE@XY", inIDfield]):
@@ -289,9 +301,9 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
     arcpy.env.extent = rrast.extent  # Very important!
     arcpy.env.snapRaster = rrast  # Very important!
     instreamslyr = 'strlyr'
-    arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
+    arcpy.MakeFeatureLayer_management(instreams_crop, instreamslyr)
     ids = []
-    for row in arcpy.SearchCursor(instreams):
+    for row in arcpy.SearchCursor(instreams_crop):
         id = row.getValue(inIDfield)
         ids.append(id)
         arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"' + inIDfield + '" = ' + str(id))
@@ -310,13 +322,30 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
     newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, startxy,
                                                          endxy, ids, lowerleft.X, lowerleft.Y, cellsize)
 
-    # Convert python list to ASCII
-
-    outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, value_to_nodata = nodatavalue))
-    arcpy.DefineProjection_management(outinnerraster, crs)
+    nfailed = len(failed)
+    nsucc = i - nfailed
 
     result = 'in_memory/result'
-    arcpy.RasterToPolyline_conversion(outinnerraster, result, background_value='NODATA', simplify='NO_SIMPLIFY')
+    if nsucc == 0:
+        arcpy.CreateFeatureclass_management('in_memory', 'result', 'POLYLINE', spatial_reference=crs)
+        arcpy.AddField_management(result, 'type', 'TEXT', field_length=10)
+    else:
+        # Convert python list to ASCII
+        outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy[0, :, :],
+                                                               lowerleft, cellsize, value_to_nodata=nodatavalue))
+        arcpy.DefineProjection_management(outinnerraster, crs)
+        arcpy.RasterToPolyline_conversion(outinnerraster, result, background_value='NODATA', simplify='NO_SIMPLIFY')
+        arcpy.AddField_management(result, 'type', 'TEXT', field_length=10)
+
+        templines = 'in_memory/templine'
+        for k in range(1, nsucc):
+            outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy[k, :, :],
+                                                                   lowerleft, cellsize, value_to_nodata=nodatavalue))
+            arcpy.DefineProjection_management(outinnerraster, crs)
+            arcpy.RasterToPolyline_conversion(outinnerraster, templines, background_value='NODATA', simplify='NO_SIMPLIFY')
+            arcpy.Append_management(templines, result, schema_type = 'NO_TEST')
+
+        arcpy.CalculateField_management(result, 'type', '"Real"')
 
     # Process failed streams using shortest path strategy
     if len(failed) > 0:
@@ -328,7 +357,7 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
         endlyr = 'endlyr'
         arcpy.MakeFeatureLayer_management(endpts, endlyr)
         i = 0
-        for row in arcpy.SearchCursor(instreams):
+        for row in arcpy.SearchCursor(instreams_crop):
             id = row.getValue(inIDfield)
             if id in failed:
 
@@ -356,14 +385,21 @@ def execute(instreams, inIDfield, inraster, outstreams, minacc, radius):
 
                 if arcpy.sa.IsNull(costpath).minimum == 0:
                     costlines = 'in_memory/costlines'
-                    arcpy.RasterToPolyline_conversion(costpath + 1, costlines, background_value='NODATA',
+                    arcpy.RasterToPolyline_conversion(costpath + 1, costlines,
+                                                      background_value='NODATA',
                                                       simplify='NO_SIMPLIFY')
                     arcpy.CalculateField_management(costlines, 'grid_code', id)
                     arcpy.Append_management(costlines, result, schema_type = 'NO_TEST')
 
             i += 1
 
-    arcpy.CopyFeatures_management(result, outstreams)
+        reslyr = 'reslyr'
+        arcpy.MakeFeatureLayer_management(result, reslyr)
+        arcpy.SelectLayerByAttribute_management(reslyr, 'NEW_SELECTION', 'type is null')
+        arcpy.CalculateField_management(reslyr, 'type', '"Imitating"')
+
+    arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
+    arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
 
 if __name__ == "__main__":
     try:
