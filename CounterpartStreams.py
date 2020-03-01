@@ -106,8 +106,8 @@ def get_neighborhood(i, j, radius, cellsize, ni, nj):
 
     return neigh
 
-def cell_distance(cell1, cell2):
-    return math.sqrt((cell1[0] - cell2[0])**2 + (cell1[1] - cell2[1])**2)
+def euc_distance(p1, p2):
+    return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
 
 def path_length(path):
     L = 0
@@ -115,7 +115,7 @@ def path_length(path):
     (ic, jc) = path[0]
     for k in range(1, n):
         (i, j) = path[k]
-        L += cell_distance((i,j), (ic,jc))
+        L += euc_distance((i, j), (ic, jc))
         ic = i
         jc = j
     return L
@@ -196,7 +196,7 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
             endneigh = get_neighborhood(iend, jend, radius, cellsize, ni, nj)
             startneigh = get_neighborhood(istart, jstart, radius, cellsize, ni, nj)
 
-            arcpy.AddMessage("Finding closest stream for river " + str(k) + " from " + str(n))
+            arcpy.AddMessage("ID = " + str(ids[k]) + ' (' + str(k+1) + " from " + str(n) + ')')
 
             stream = []
             weight = float('Inf')
@@ -222,7 +222,7 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
                         L = path_length(startstream) + 1
 
                         E = sum(e[0:nstart]) / (cellsize * L)
-                        D = cell_distance((i, j), startneigh[0]) / L
+                        D = euc_distance((i, j), startneigh[0]) / L
                         w = math.sqrt(E + 1) * (D + 1)
                         if w < weight:
                             stream = s
@@ -256,6 +256,14 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
                 str(sys.exc_type)+ ": " + str(sys.exc_value) + "\n"
         arcpy.AddError(pymsg)
         raise Exception
+
+# borrowed from https://gis.stackexchange.com/questions/150200/reversing-polyline-direction-based-on-raster-value-using-arcpy
+def FlipLine(Line):
+    rPnts = arcpy.Array()
+    for i in range(len(Line)):
+        rPnts.append(Line[len(Line) - i - 1]) # flip the points in the array
+    OutShape = arcpy.Polyline(rPnts)
+    return OutShape
 
 def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviation):
     global MAXACC
@@ -311,14 +319,10 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
         eucs[i, :, :] = arcpy.RasterToNumPyArray(euc)
         i += 1
 
-    arcpy.AddMessage(startID)
-    arcpy.AddMessage(endID)
-    arcpy.AddMessage(ids)
-
     # return
 
     # Tracing stream lines
-    arcpy.AddMessage("Searching for closest stream lines...")
+    arcpy.AddMessage("Tracing real counterpart streams...")
     newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, deviation, startxy,
                                                          endxy, ids, lowerleft.X, lowerleft.Y, cellsize)
 
@@ -348,20 +352,21 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
         arcpy.CalculateField_management(result, 'type', '"Real"')
 
     # Process failed streams using shortest path strategy
-    if len(failed) > 0:
+    if nfailed > 0:
 
-        arcpy.AddMessage("Searching for spurious counterpart streams. IDs: " + str(failed))
+        arcpy.AddMessage("Tracing imitated counterpart streams. IDs: " + str(failed))
 
         startlyr = 'startlyr'
         arcpy.MakeFeatureLayer_management(startpts, startlyr)
         endlyr = 'endlyr'
         arcpy.MakeFeatureLayer_management(endpts, endlyr)
         i = 0
+        k = 0
         for row in arcpy.SearchCursor(instreams_crop):
             id = row.getValue(inIDfield)
             if id in failed:
 
-                arcpy.AddMessage("ID =  " + str(id))
+                arcpy.AddMessage("ID =  " + str(id) + ' (' + str(k+1) + " from " + str(nfailed) + ')')
 
                 arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
                                                         '"' + inIDfield + '" = ' + str(id))
@@ -391,6 +396,8 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
                     arcpy.CalculateField_management(costlines, 'grid_code', id)
                     arcpy.Append_management(costlines, result, schema_type = 'NO_TEST')
 
+                k += 1
+
             i += 1
 
         reslyr = 'reslyr'
@@ -399,6 +406,23 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
         arcpy.CalculateField_management(reslyr, 'type', '"Imitating"')
 
     arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
+
+    # ensure right direction
+    arcpy.AddMessage('Ensuring right direction of counterpart streams...')
+
+    with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
+        for row in rows:
+            line = row[0].getPart(0)
+            count_start = [line[0].X, line[0].Y]
+            id = row[1]
+
+            hydro_start = startxy[startID.index(id)]
+            hydro_end = endxy[endID.index(id)]
+
+            if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
+                row[0] = FlipLine(line)
+                rows.updateRow(row)
+
     arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
 
 if __name__ == "__main__":
