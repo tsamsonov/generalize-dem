@@ -170,7 +170,7 @@ def trace_flow_cells(accraster, euc, i, j, minacc, endneigh, down = True):
         arcpy.AddError(pymsg)
         raise Exception
 
-def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, miny, cellsize):
+def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, ids, minx, miny, cellsize):
 
     try:
         global MAXACC
@@ -205,7 +205,7 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, mi
                     s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
                     ncells = len(e)
 
-                    if ncells > 0:
+                    if ncells > 0 and max(e) <= deviation:
                         l = 0
                         cur = s[l]
                         startstream = []
@@ -257,7 +257,7 @@ def process_raster(inraster, eucs, minacc, radius, startxy, endxy, ids, minx, mi
         arcpy.AddError(pymsg)
         raise Exception
 
-def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius):
+def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviation):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -319,7 +319,7 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius):
 
     # Tracing stream lines
     arcpy.AddMessage("Searching for closest stream lines...")
-    newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, startxy,
+    newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, deviation, startxy,
                                                          endxy, ids, lowerleft.X, lowerleft.Y, cellsize)
 
     nfailed = len(failed)
@@ -372,7 +372,7 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius):
                 euc = arcpy.NumPyArrayToRaster(eucs[i,:,:], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
-                euc_mask = arcpy.sa.Reclassify(euc, "value", arcpy.sa.RemapRange([[0,radius, 100000],[radius,euc.maximum,'NODATA']]))
+                euc_mask = arcpy.sa.Reclassify(euc, "value", arcpy.sa.RemapRange([[0,deviation, 100000],[deviation,euc.maximum,'NODATA']]))
 
                 strs = arcpy.sa.Reclassify(inraster, "value", arcpy.sa.RemapRange([[0,minacc,'NODATA'],[minacc,MAXACC,1]]))
 
@@ -409,8 +409,10 @@ if __name__ == "__main__":
         outStreams = arcpy.GetParameterAsText(3)
         minAcc = float(arcpy.GetParameterAsText(4))
         radius = float(arcpy.GetParameterAsText(5))
+        deviation = float(arcpy.GetParameterAsText(6))
 
-        execute(inStreams, inIDfield, inRaster, outStreams, minAcc, radius)
+        execute(inStreams, inIDfield, inRaster, outStreams, minAcc, radius, deviation)
+
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]

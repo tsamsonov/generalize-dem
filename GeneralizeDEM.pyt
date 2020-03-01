@@ -232,7 +232,14 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_field, in_raster, out_streams, min_acc, radius]
+        deviation = arcpy.Parameter(
+            displayName="Maximum deviation",
+            name="deviation",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        params = [in_streams, in_field, in_raster, out_streams, min_acc, radius, deviation]
         return params
 
     def isLicensed(self):
@@ -251,9 +258,10 @@ class CounterpartStreams(object):
         inraster = parameters[2].valueAsText
         outstreams = parameters[3].valueAsText
         minacc = float(parameters[4].valueAsText)
-        radius = int(parameters[5].valueAsText)
+        radius = float(parameters[5].valueAsText)
+        deviation = float(parameters[6].valueAsText)
 
-        CS.execute(instreams, inidfield, inraster, outstreams, minacc, radius)
+        CS.execute(instreams, inidfield, inraster, outstreams, minacc, radius, deviation)
 
         return
 
