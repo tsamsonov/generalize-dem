@@ -209,6 +209,13 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
+        dem_raster = arcpy.Parameter(
+            displayName="Input elevation raster",
+            name="dem_raster",
+            datatype="GPRasterLayer",
+            parameterType="Required",
+            direction="Input")
+
         out_streams = arcpy.Parameter(
             displayName="Output counterpart streams feature class",
             name="out_streams",
@@ -239,7 +246,7 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_field, in_raster, out_streams, min_acc, radius, deviation]
+        params = [in_streams, in_field, in_raster, dem_raster, out_streams, min_acc, radius, deviation]
         return params
 
     def isLicensed(self):
@@ -256,12 +263,13 @@ class CounterpartStreams(object):
         instreams = parameters[0].valueAsText
         inidfield= parameters[1].valueAsText
         inraster = parameters[2].valueAsText
-        outstreams = parameters[3].valueAsText
-        minacc = float(parameters[4].valueAsText)
-        radius = float(parameters[5].valueAsText)
-        deviation = float(parameters[6].valueAsText)
+        demraster = parameters[3].valueAsText
+        outstreams = parameters[4].valueAsText
+        minacc = float(parameters[5].valueAsText)
+        radius = float(parameters[6].valueAsText)
+        deviation = float(parameters[7].valueAsText)
 
-        CS.execute(instreams, inidfield, inraster, outstreams, minacc, radius, deviation)
+        CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, radius, deviation)
 
         return
 

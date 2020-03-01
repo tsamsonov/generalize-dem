@@ -265,7 +265,7 @@ def FlipLine(Line):
     OutShape = arcpy.Polyline(rPnts)
     return OutShape
 
-def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviation):
+def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, radius, deviation):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -333,6 +333,7 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
     if nsucc == 0:
         arcpy.CreateFeatureclass_management('in_memory', 'result', 'POLYLINE', spatial_reference=crs)
         arcpy.AddField_management(result, 'type', 'TEXT', field_length=10)
+        arcpy.AddField_management(result, 'grid_code', 'LONG')
     else:
         # Convert python list to ASCII
         outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy[0, :, :],
@@ -377,13 +378,13 @@ def execute(in_streams, inIDfield, inraster, outstreams, minacc, radius, deviati
                 euc = arcpy.NumPyArrayToRaster(eucs[i,:,:], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
-                euc_mask = arcpy.sa.Reclassify(euc, "value", arcpy.sa.RemapRange([[0,deviation, 100000],[deviation,euc.maximum,'NODATA']]))
+                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value", arcpy.sa.RemapRange([[0,deviation, 100000],[deviation,euc.maximum,'NODATA']]))
 
                 strs = arcpy.sa.Reclassify(inraster, "value", arcpy.sa.RemapRange([[0,minacc,'NODATA'],[minacc,MAXACC,1]]))
 
-                cost = arcpy.sa.ExtractByMask(strs, euc_mask) * euc
+                cost = euc * arcpy.sa.ExtractByMask(strs, euc_mask)
 
-                arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
+                arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demRaster), cost, 'MINIMUM')
 
                 backlink = arcpy.sa.CostBackLink(startlyr, cost)
                 costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
@@ -430,12 +431,13 @@ if __name__ == "__main__":
         inStreams = arcpy.GetParameterAsText(0)
         inIDfield = arcpy.GetParameterAsText(1)
         inRaster = arcpy.GetParameterAsText(2)
-        outStreams = arcpy.GetParameterAsText(3)
-        minAcc = float(arcpy.GetParameterAsText(4))
-        radius = float(arcpy.GetParameterAsText(5))
-        deviation = float(arcpy.GetParameterAsText(6))
+        demRaster = arcpy.GetParameterAsText(3)
+        outStreams = arcpy.GetParameterAsText(4)
+        minAcc = float(arcpy.GetParameterAsText(5))
+        radius = float(arcpy.GetParameterAsText(6))
+        deviation = float(arcpy.GetParameterAsText(7))
 
-        execute(inStreams, inIDfield, inRaster, outStreams, minAcc, radius, deviation)
+        execute(inStreams, inIDfield, inRaster, demRaster, outStreams, minAcc, radius, deviation)
 
     except:
         tb = sys.exc_info()[2]
