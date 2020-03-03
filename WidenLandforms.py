@@ -11,7 +11,7 @@ from arcpy.sa import *
 __author__ = 'Timofey Samsonov'
 
 
-def execute(demdataset, streams, distance, windowsize, output, ftype):
+def execute(demdataset, streams, distance, windowsize, output, ftype, ridges):
 
     arcpy.CheckOutExtension("Spatial")
 
@@ -32,47 +32,78 @@ def execute(demdataset, streams, distance, windowsize, output, ftype):
     w_valleys = Con(divdistminus, 0, divdistminus, "value < 0")
 
     # Derive ridges weights
-    arcpy.AddMessage("Calculating ridge weights...")
-    distminus = Minus(distances, distance)
-    distminusdiv = Divide(distminus, distance)
-    udistminusdiv = Con(distminusdiv, 0, distminusdiv, "value < 0")
-    w_ridges = Con(udistminusdiv, 1, udistminusdiv, "value > 1")
+    if (ridges):
+        arcpy.AddMessage("Calculating ridge weights...")
+        distminus = Minus(distances, distance)
+        distminusdiv = Divide(distminus, distance)
+        udistminusdiv = Con(distminusdiv, 0, distminusdiv, "value < 0")
+        w_ridges = Con(udistminusdiv, 1, udistminusdiv, "value > 1")
 
-    # Derive source dem weights
-    arcpy.AddMessage("Calculating source dem weights...")
-    w_both = Plus(w_valleys, w_ridges)
-    w_dem = Minus(1, w_both)
+        # Derive source dem weights
+        arcpy.AddMessage("Calculating source dem weights...")
+        w_both = Plus(w_valleys, w_ridges)
+        w_dem = Minus(1, w_both)
 
-    # Get valley and ridge values
-    arcpy.AddMessage("Filtering elevations...")
-    
-    if ftype == "Min/Max":
-        arcpy.CheckOutExtension("3D")
-        arcpy.CheckOutExtension("Spatial")
-        neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
-        valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
-        ridges = FocalStatistics(dem, neighborhood, "MAXIMUM", "DATA")
+        # Get valley and ridge values
+        arcpy.AddMessage("Filtering elevations...")
+
+        if ftype == "Min/Max":
+            arcpy.CheckOutExtension("3D")
+            arcpy.CheckOutExtension("Spatial")
+            neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
+            valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
+            ridges = FocalStatistics(dem, neighborhood, "MAXIMUM", "DATA")
+        else:
+            val = workspace + "/val"
+            rig = workspace + "/rig"
+            FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile")
+            FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile")
+            valleys = arcpy.Raster(val)
+            ridges = arcpy.Raster(rig)
+
+        # Calculate weighted values
+        arcpy.AddMessage("Calculating weighted values...")
+        weightedvalleys = Times(valleys, w_valleys)
+        weightedridges = Times(ridges, w_ridges)
+        weighteddem = Times(dem, w_dem)
+
+        # Mix values
+        arcpy.AddMessage("Mixing values...")
+        mixvalleyridges = Plus(weightedvalleys, weightedridges)
+        mixall = Plus(weighteddem, mixvalleyridges)
+
+        # Save the result
+        mixall.save(output)
+
     else:
-        val = workspace + "/val"
-        rig = workspace + "/rig"
-        FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile")
-        FilterDEM.execute(demdataset, rig, windowsize, 1, "Upper Quartile")
-        valleys = arcpy.Raster(val)
-        ridges = arcpy.Raster(rig)
-        
-    # Calculate weighted values
-    arcpy.AddMessage("Calculating weighted values...")
-    weightedvalleys = Times(valleys, w_valleys)
-    weightedridges = Times(ridges, w_ridges)
-    weighteddem = Times(dem, w_dem)
 
-    # Mix values
-    arcpy.AddMessage("Mixing values...")
-    mixvalleyridges = Plus(weightedvalleys, weightedridges)
-    mixall = Plus(weighteddem, mixvalleyridges)
+        # Derive source dem weights
+        arcpy.AddMessage("Calculating source dem weights...")
+        w_dem = Minus(1, w_valleys)
 
-    # Save the result
-    mixall.save(output)
+        # Get valley values
+        arcpy.AddMessage("Filtering elevations...")
+
+        if ftype == "Min/Max":
+            neighborhood = NbrRectangle(windowsize, windowsize, "CELL")
+            valleys = FocalStatistics(dem, neighborhood, "MINIMUM", "DATA")
+        else:
+            val = workspace + "/val"
+            FilterDEM.execute(demdataset, val, windowsize, 1, "Lower Quartile")
+            valleys = arcpy.Raster(val)
+
+        # Calculate weighted values
+        arcpy.AddMessage("Calculating weighted values...")
+        weightedvalleys = Times(valleys, w_valleys)
+        weighteddem = Times(dem, w_dem)
+
+        # Mix values
+        arcpy.AddMessage("Mixing values...")
+        mixall = Plus(weighteddem, weightedvalleys)
+
+        # Save the result
+        mixall.save(output)
+
 
 if __name__ == "__main__":
     try:
@@ -82,8 +113,9 @@ if __name__ == "__main__":
         windowsize = int(arcpy.GetParameterAsText(3))
         output = arcpy.GetParameterAsText(4)
         ftype = arcpy.GetParameterAsText(5)
+        ridges = arcpy.GetParameterAsText(6)
 
-        execute(demdataset, streams, distance, windowsize, output, ftype)
+        execute(demdataset, streams, distance, windowsize, output, ftype, ridges)
     except:
         tb = sys.exc_info()[2]
         tbinfo = traceback.format_tb(tb)[0]

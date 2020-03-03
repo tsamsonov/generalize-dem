@@ -481,7 +481,14 @@ class WidenLandforms(object):
         ftype.value = 'Min/Max'
         ftype.filter.list = ['Min/Max', 'Lower/Upper Quartile']
 
-        params = [inraster, streams, outraster, distance, windowsize, ftype]
+        ridges = arcpy.Parameter(
+            displayName="Widen ridges?",
+            name="ridges",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
+        params = [inraster, streams, outraster, distance, windowsize, ftype, ridges]
         return params
 
     def isLicensed(self):
@@ -507,8 +514,9 @@ class WidenLandforms(object):
         distance = float(parameters[3].valueAsText)
         windowsize = int(parameters[4].valueAsText)
         ftype = parameters[5].valueAsText
+        ridges = parameters[6].valueAsText
 
-        WL.execute(demdataset, streams, distance, windowsize, output, ftype)
+        WL.execute(demdataset, streams, distance, windowsize, output, ftype, ridges)
 
         return
 
