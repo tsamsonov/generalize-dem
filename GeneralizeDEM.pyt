@@ -7,6 +7,7 @@ import arcpy
 import traceback
 
 import FilterDEM as FD
+import CarveDEM as CD
 import ConflationLinks as CL
 import CreateFishnet as CF
 import ConflateDEMbyLinks as CB
@@ -23,7 +24,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
+        self.tools = [CreateFishnet, CarveDEM, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
 
 class CreateFishnet(object):
 
@@ -280,6 +281,70 @@ class CounterpartStreams(object):
         deviation = float(parameters[8].valueAsText)
 
         CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, penalty, radius, deviation)
+
+        return
+
+class CarveDEM(object):
+
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Carve DEM Along Streams"
+        self.description = ""
+        self.canRunInBackground = True
+
+    def getParameterInfo(self):
+
+        in_raster = arcpy.Parameter(
+            displayName="Input raster DEM",
+            name="in_raster",
+            datatype="GPRasterLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_streams = arcpy.Parameter(
+            displayName="Input reference hydrographic lines",
+            name="in_streams",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_field = arcpy.Parameter(
+            displayName="Hydrographic line ID field",
+            name="in_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        in_field.filter.list = ['Short', 'Long']
+        in_field.parameterDependencies = [in_streams.name]
+
+        out_raster = arcpy.Parameter(
+            displayName="Output raster DEM",
+            name="out_raster",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Output")
+
+        params = [in_raster, in_streams, in_field, out_raster]
+        return params
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+
+        in_raster = parameters[0].valueAsText
+        in_streams = parameters[1].valueAsText
+        in_field = parameters[2].valueAsText
+        out_raster = parameters[3].valueAsText
+
+        CD.execute(in_raster, in_streams, in_field, out_raster)
 
         return
 
