@@ -170,7 +170,7 @@ def trace_flow_cells(accraster, euc, i, j, minacc, endneigh, down = True):
         arcpy.AddError(pymsg)
         raise Exception
 
-def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, ids, minx, miny, cellsize):
+def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, ids, nears, minx, miny, cellsize):
 
     try:
         global MAXACC
@@ -265,6 +265,9 @@ def FlipLine(Line):
     OutShape = arcpy.Polyline(rPnts)
     return OutShape
 
+def get_values(features, field):
+    return numpy.asarray([row[0] for row in arcpy.da.SearchCursor(features, field)])
+
 def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
@@ -281,53 +284,95 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     instreams_crop = 'in_memory/str_cropped'
     arcpy.Clip_analysis(in_streams, domain, instreams_crop)
 
+
+    # Get start and endpoints of rivers
     startpts = 'in_memory/startpts'
     endpts = 'in_memory/endpts'
 
 
     arcpy.FeatureVerticesToPoints_management(instreams_crop, startpts, point_location='START')
     startxy = []
-    startID = []
+    # startID = []
     for row in arcpy.da.SearchCursor(startpts, ["SHAPE@XY", inIDfield]):
         x, y = row[0]
         startxy.append([x, y])
-        startID.append(row[1])
+        # startID.append(row[1])
 
 
     arcpy.FeatureVerticesToPoints_management(instreams_crop, endpts, point_location = 'END')
     endxy = []
-    endID = []
+    # endID = []
     for row in arcpy.da.SearchCursor(endpts, ["SHAPE@XY", inIDfield]):
         x, y = row[0]
         endxy.append([x, y])
-        endID.append(row[1])
+        # endID.append(row[1])
+
+    # Calculate distance to determine hierarchy
+
+    dist_ends = 'in_memory/dist_ends'
+    dist_lines = 'in_memory/dist_lines'
+
+    arcpy.GenerateNearTable_analysis(endpts, in_streams, dist_lines, closest_count=2)
+    ids = get_values(in_streams, inIDfield)
+    ins = get_values(dist_ends, 'IN_FID')
+    nears = get_values(dist_ends, 'NEAR_FID')
+    dist = get_values(dist_ends, 'NEAR_DIST')
+
+    N = len(ids)
+
+    # dependent are streams which endpoints are located
+    # less or equal to cellsize from another
+
+    flt = ins != nears and dist <= cellsize
+
+    depids = ids[flt]
+    depnears = ids[nears[flt]]
+
+    # construct the order
+    flt2 = ins != nears and dist > cellsize
+    ordids = ids[flt2]
+    ordnears = ids[nears[flt2]]
+    ordnears.fill(-1) # TODO: make this value more robust
+
+    while(len(depnears) > 0):
+        ord = numpy.in1d(depnears, depids)
+        ordids = numpy.append(ordids, depids[ord])
+        ordnears = numpy.append(ordnears, depnears[ord])
+        depids = depids[not ord]
+        depnears = depnears[not ord]
+
+    idx = numpy.zeros(N)
+
+    for i in range(N):
+        idx[i] = numpy.where(ids == ordids[i])[0]
+
+    startxy = [startxy[i] for i in idx]
+    endxy = [endxy[i] for i in idx]
+
+    # arcpy.GenerateNearTable_analysis(endpts, dist_ends, dist_lines, closest_count=2)
 
     eucs = numpy.zeros((len(startxy), rasternumpy.shape[0], rasternumpy.shape[1])).astype(float)
 
-    i = 0
     rrast = arcpy.sa.Raster(inraster)
     arcpy.env.extent = rrast.extent  # Very important!
     arcpy.env.snapRaster = rrast  # Very important!
     instreamslyr = 'strlyr'
     arcpy.MakeFeatureLayer_management(instreams_crop, instreamslyr)
-    ids = []
-    for row in arcpy.SearchCursor(instreams_crop):
-        id = row.getValue(inIDfield)
-        ids.append(id)
-        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"' + inIDfield + '" = ' + str(id))
+
+    for i in range(N):
+        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"' + inIDfield + '" = ' + str(ids[i]))
         euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
         eucs[i, :, :] = arcpy.RasterToNumPyArray(euc)
-        i += 1
 
     # return
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing real counterpart streams...")
     newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, deviation, startxy,
-                                                         endxy, ids, lowerleft.X, lowerleft.Y, cellsize)
+                                                         endxy, ordids, ordnears, lowerleft.X, lowerleft.Y, cellsize)
 
     nfailed = len(failed)
-    nsucc = i - nfailed
+    nsucc = N - nfailed
 
     result = 'in_memory/result'
     if nsucc == 0:
@@ -419,8 +464,8 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             count_start = [line[0].X, line[0].Y]
             id = row[1]
 
-            hydro_start = startxy[startID.index(id)]
-            hydro_end = endxy[endID.index(id)]
+            hydro_start = startxy[ids.index(id)]
+            hydro_end = endxy[ids.index(id)]
 
             if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
                 row[0] = FlipLine(line)
