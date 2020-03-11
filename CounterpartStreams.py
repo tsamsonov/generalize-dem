@@ -230,6 +230,9 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
 
             if len(stream) == 0:
                 failed.append(ids[k])
+
+
+
             else:
                 streams.append(stream)
                 succeeded.append(ids[k])
@@ -312,42 +315,53 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     dist_ends = 'in_memory/dist_ends'
     dist_lines = 'in_memory/dist_lines'
 
-    arcpy.GenerateNearTable_analysis(endpts, in_streams, dist_lines, closest_count=2)
-    ids = get_values(in_streams, inIDfield)
-    ins = get_values(dist_ends, 'IN_FID')
-    nears = get_values(dist_ends, 'NEAR_FID')
-    dist = get_values(dist_ends, 'NEAR_DIST')
+    arcpy.GenerateNearTable_analysis(endpts, instreams_crop, dist_lines, closest=False, closest_count=2)
+    ids = get_values(instreams_crop, inIDfield)
+    ins = get_values(dist_lines, 'IN_FID')
+    nears = get_values(dist_lines, 'NEAR_FID')
+    dist = get_values(dist_lines, 'NEAR_DIST')
+
+    arcpy.AddMessage(ins)
+    arcpy.AddMessage(nears)
+    arcpy.AddMessage(dist)
 
     N = len(ids)
 
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
 
-    flt = ins != nears and dist <= cellsize
+    flt = numpy.logical_and(ins != nears, dist <= cellsize)
 
-    depids = ids[flt]
-    depnears = ids[nears[flt]]
+    depids = ids[ins[flt] - 1]
+    depnears = ids[nears[flt] - 1]
 
     # construct the order
-    flt2 = ins != nears and dist > cellsize
-    ordids = ids[flt2]
-    ordnears = ids[nears[flt2]]
-    ordnears.fill(-1) # TODO: make this value more robust
+    flt2 = numpy.logical_and(ins != nears, dist > cellsize)
+    ordids = ids[ins[flt2] - 1]
+    ordnears = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
+
+    arcpy.AddMessage(ordids)
+    arcpy.AddMessage(ordnears)
 
     while(len(depnears) > 0):
         ord = numpy.in1d(depnears, depids)
         ordids = numpy.append(ordids, depids[ord])
         ordnears = numpy.append(ordnears, depnears[ord])
-        depids = depids[not ord]
-        depnears = depnears[not ord]
+        depids = depids[numpy.logical_not(ord)]
+        depnears = depnears[numpy.logical_not(ord)]
 
-    idx = numpy.zeros(N)
+    idx = numpy.zeros(N).astype(int)
 
     for i in range(N):
         idx[i] = numpy.where(ids == ordids[i])[0]
 
     startxy = [startxy[i] for i in idx]
     endxy = [endxy[i] for i in idx]
+
+    arcpy.AddMessage(ordids)
+    arcpy.AddMessage(ordnears)
+
+    return
 
     # arcpy.GenerateNearTable_analysis(endpts, dist_ends, dist_lines, closest_count=2)
 
