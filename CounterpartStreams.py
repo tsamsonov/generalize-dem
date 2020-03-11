@@ -344,7 +344,7 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     arcpy.AddMessage(ordnears)
 
     while(len(depnears) > 0):
-        ord = numpy.in1d(depnears, depids)
+        ord = numpy.logical_not(numpy.in1d(depnears, depids))
         ordids = numpy.append(ordids, depids[ord])
         ordnears = numpy.append(ordnears, depnears[ord])
         depids = depids[numpy.logical_not(ord)]
