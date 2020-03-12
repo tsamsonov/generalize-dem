@@ -170,21 +170,81 @@ def trace_flow_cells(accraster, euc, i, j, minacc, endneigh, down = True):
         arcpy.AddError(pymsg)
         raise Exception
 
-def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, ids, nears, minx, miny, cellsize):
+# borrowed from https://gis.stackexchange.com/questions/150200/reversing-polyline-direction-based-on-raster-value-using-arcpy
+def FlipLine(Line):
+    rPnts = arcpy.Array()
+    for i in range(len(Line)):
+        rPnts.append(Line[len(Line) - i - 1]) # flip the points in the array
+    OutShape = arcpy.Polyline(rPnts)
+    return OutShape
+
+def get_values(features, field):
+    return numpy.asarray([row[0] for row in arcpy.da.SearchCursor(features, field)])
+
+def set_values(features, field, values):
+    with arcpy.da.UpdateCursor(features, field) as rows:
+        i = 0
+        for row in rows:
+            row[0] = values[i]
+            rows.updateRow(row)
+            i += 1
+    return features
+
+def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
+                   ids, ordids, ordnears, lowerleft, cellsize, crs, outstreams):
 
     try:
         global MAXACC
+
+        rrast = arcpy.sa.Raster(in_raster)
+        arcpy.env.extent = rrast.extent  # Very important!
+        arcpy.env.snapRaster = rrast  # Very important!
+
+        inraster = arcpy.RasterToNumPyArray(in_raster, nodata_to_value=MAXACC + 1)
+
         ni = inraster.shape[0]
         nj = inraster.shape[1]
-        n = len(startxy)
+        n = len(ids)
+
+        minx = lowerleft.X
+        miny = lowerleft.Y
+
+        eucs = numpy.zeros((len(ids), inraster.shape[0], inraster.shape[1])).astype(float)
+
+        instreamslyr = 'strlyr'
+        arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
+
+        for i in range(n):
+            arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
+                                                    '"' + inIDfield + '" = ' + str(ordids[i]))
+            euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
+            eucs[i, :, :] = arcpy.RasterToNumPyArray(euc)
+
+        idx = numpy.zeros(n).astype(int)
+
+        for i in range(n):
+            idx[i] = numpy.where(ids == ordids[i])[0]
+
+        startxy = []
+        for row in arcpy.da.SearchCursor(startpts, ["SHAPE@XY"]):
+            x, y = row[0]
+            startxy.append([x, y])
+
+        endxy = []
+        for row in arcpy.da.SearchCursor(endpts, ["SHAPE@XY"]):
+            x, y = row[0]
+            endxy.append([x, y])
+
+        startxy = [startxy[i] for i in idx]
+        endxy = [endxy[i] for i in idx]
 
         extinraster = extend_array(inraster, 1, 1, 0)
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
 
         streams = []
-        failed = []
-        succeeded = []
+        types = []
+
         for k in range(n):
 
             iend = ni - math.trunc((endxy[k][1] - miny) / cellsize) - 1
@@ -196,7 +256,7 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
             endneigh = get_neighborhood(iend, jend, radius, cellsize, ni, nj)
             startneigh = get_neighborhood(istart, jstart, radius, cellsize, ni, nj)
 
-            arcpy.AddMessage("ID = " + str(ids[k]) + ' (' + str(k+1) + " from " + str(n) + ')')
+            arcpy.AddMessage("ID = " + str(ordids[k]) + ' (' + str(k + 1) + " from " + str(n) + ')')
 
             stream = []
             weight = float('Inf')
@@ -228,29 +288,113 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
                             stream = s
                             weight = w
 
-            if len(stream) == 0:
-                failed.append(ids[k])
-
-
+            if len(stream) > 0:
+                streams.append(stream)
+                types.append('Stream')
 
             else:
+                arcpy.AddMessage("Using shortest path strategy")
+
+                startlyr = 'startlyr'
+                arcpy.MakeFeatureLayer_management(startpts, startlyr)
+                endlyr = 'endlyr'
+                arcpy.MakeFeatureLayer_management(endpts, endlyr)
+
+                arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
+                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
+                arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
+                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
+                arcpy.SelectLayerByAttribute_management(endlyr, 'NEW_SELECTION',
+                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
+                euc = arcpy.NumPyArrayToRaster(eucs[k, :, :], lowerleft, cellsize)
+                arcpy.DefineProjection_management(euc, crs)
+
+                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
+                                                           arcpy.sa.RemapRange([[0, deviation, penalty],
+                                                                                [deviation, euc.maximum,
+                                                                                 'NODATA']]))
+
+                strs = arcpy.sa.Reclassify(in_raster, "value",
+                                           arcpy.sa.RemapRange([[0, minacc, 'NODATA'], [minacc, MAXACC, 1]]))
+
+                cost = euc * arcpy.sa.ExtractByMask(strs, euc_mask)
+
+                arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
+
+                backlink = arcpy.sa.CostBackLink(startlyr, cost)
+                costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
+                costdist = arcpy.sa.CostDistance(startlyr, cost)
+
+                nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
+                npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
+
+                cellidx = numpy.where(nppath >= 0)
+                cells = numpy.argwhere(nppath >= 0)
+
+                values = npdist[cellidx]
+
+                idx = numpy.argsort(values)
+
+                stream = cells[idx, :]
                 streams.append(stream)
-                succeeded.append(ids[k])
+
+                types.append('Path')
 
             arcpy.SetProgressorPosition(k)
 
         outraster = None
-        nodatavalue = 0 if (min(ids) > 0) else min(ids) - 1
+        nodatavalue = 0 if (min(ordids) > 0) else min(ordids) - 1
+
         N = len(streams)
 
         if (N > 0):
             outraster = numpy.full((N, ni, nj), nodatavalue)
-
             for l in range(N):
                 for ncells in range(len(streams[l])):
-                    outraster[l, streams[l][ncells][0], streams[l][ncells][1]] = succeeded[l]
+                    outraster[l, streams[l][ncells][0], streams[l][ncells][1]] = ordids[l]
 
-        return outraster, nodatavalue, failed
+        outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(outraster[0, :, :],
+                                                               lowerleft, cellsize, value_to_nodata=nodatavalue))
+        arcpy.DefineProjection_management(outinnerraster, crs)
+
+        result = 'in_memory/result'
+        arcpy.RasterToPolyline_conversion(outinnerraster, result, background_value='NODATA', simplify='NO_SIMPLIFY')
+
+        templines = 'in_memory/templine'
+        for k in range(1, N):
+            outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(outraster[k, :, :],
+                                                                   lowerleft, cellsize, value_to_nodata=nodatavalue))
+            arcpy.DefineProjection_management(outinnerraster, crs)
+            arcpy.RasterToPolyline_conversion(outinnerraster, templines, background_value='NODATA',
+                                              simplify='NO_SIMPLIFY')
+            arcpy.Append_management(templines, result, schema_type='NO_TEST')
+
+        arcpy.AddField_management(result, 'type', 'TEXT', field_length=6)
+        result = set_values(result, 'type', types)
+
+        arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
+
+        # ensure right direction
+        arcpy.AddMessage('Ensuring right direction of counterpart streams...')
+
+        with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
+            for row in rows:
+                line = row[0].getPart(0)
+                count_start = [line[0].X, line[0].Y]
+                id = row[1]
+
+                idx = numpy.where(ordids == id)[0].tolist()[0]
+                
+                hydro_start = startxy[idx]
+                hydro_end = endxy[idx]
+
+                if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
+                    row[0] = FlipLine(line)
+                    rows.updateRow(row)
+
+        arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
+
+        return
 
     except:
         tb = sys.exc_info()[2]
@@ -260,17 +404,6 @@ def process_raster(inraster, eucs, minacc, radius, deviation, startxy, endxy, id
         arcpy.AddError(pymsg)
         raise Exception
 
-# borrowed from https://gis.stackexchange.com/questions/150200/reversing-polyline-direction-based-on-raster-value-using-arcpy
-def FlipLine(Line):
-    rPnts = arcpy.Array()
-    for i in range(len(Line)):
-        rPnts.append(Line[len(Line) - i - 1]) # flip the points in the array
-    OutShape = arcpy.Polyline(rPnts)
-    return OutShape
-
-def get_values(features, field):
-    return numpy.asarray([row[0] for row in arcpy.da.SearchCursor(features, field)])
-
 def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
@@ -278,8 +411,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
     cellsize = desc.meanCellWidth
     crs = desc.spatialReference
-
-    rasternumpy = arcpy.RasterToNumPyArray(inraster, nodata_to_value = MAXACC + 1)
 
     domain = 'in_memory/domain'
     arcpy.RasterDomain_3d(inraster, domain, 'POLYGON')
@@ -292,27 +423,10 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     startpts = 'in_memory/startpts'
     endpts = 'in_memory/endpts'
 
-
-    arcpy.FeatureVerticesToPoints_management(instreams_crop, startpts, point_location='START')
-    startxy = []
-    # startID = []
-    for row in arcpy.da.SearchCursor(startpts, ["SHAPE@XY", inIDfield]):
-        x, y = row[0]
-        startxy.append([x, y])
-        # startID.append(row[1])
-
-
+    arcpy.FeatureVerticesToPoints_management(instreams_crop, startpts, point_location = 'START')
     arcpy.FeatureVerticesToPoints_management(instreams_crop, endpts, point_location = 'END')
-    endxy = []
-    # endID = []
-    for row in arcpy.da.SearchCursor(endpts, ["SHAPE@XY", inIDfield]):
-        x, y = row[0]
-        endxy.append([x, y])
-        # endID.append(row[1])
 
     # Calculate distance to determine hierarchy
-
-    dist_ends = 'in_memory/dist_ends'
     dist_lines = 'in_memory/dist_lines'
 
     arcpy.GenerateNearTable_analysis(endpts, instreams_crop, dist_lines, closest=False, closest_count=2)
@@ -320,12 +434,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     ins = get_values(dist_lines, 'IN_FID')
     nears = get_values(dist_lines, 'NEAR_FID')
     dist = get_values(dist_lines, 'NEAR_DIST')
-
-    arcpy.AddMessage(ins)
-    arcpy.AddMessage(nears)
-    arcpy.AddMessage(dist)
-
-    N = len(ids)
 
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
@@ -350,142 +458,13 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
         depids = depids[numpy.logical_not(ord)]
         depnears = depnears[numpy.logical_not(ord)]
 
-    idx = numpy.zeros(N).astype(int)
+    # Tracing stream lines
+    arcpy.AddMessage("Tracing counterpart streams...")
 
-    for i in range(N):
-        idx[i] = numpy.where(ids == ordids[i])[0]
-
-    startxy = [startxy[i] for i in idx]
-    endxy = [endxy[i] for i in idx]
-
-    arcpy.AddMessage(ordids)
-    arcpy.AddMessage(ordnears)
+    process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
+                   startpts, endpts, ids, ordids, ordnears, lowerleft, cellsize, crs, outstreams)
 
     return
-
-    # arcpy.GenerateNearTable_analysis(endpts, dist_ends, dist_lines, closest_count=2)
-
-    eucs = numpy.zeros((len(startxy), rasternumpy.shape[0], rasternumpy.shape[1])).astype(float)
-
-    rrast = arcpy.sa.Raster(inraster)
-    arcpy.env.extent = rrast.extent  # Very important!
-    arcpy.env.snapRaster = rrast  # Very important!
-    instreamslyr = 'strlyr'
-    arcpy.MakeFeatureLayer_management(instreams_crop, instreamslyr)
-
-    for i in range(N):
-        arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION', '"' + inIDfield + '" = ' + str(ids[i]))
-        euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
-        eucs[i, :, :] = arcpy.RasterToNumPyArray(euc)
-
-    # return
-
-    # Tracing stream lines
-    arcpy.AddMessage("Tracing real counterpart streams...")
-    newrasternumpy, nodatavalue, failed = process_raster(rasternumpy, eucs, minacc, radius, deviation, startxy,
-                                                         endxy, ordids, ordnears, lowerleft.X, lowerleft.Y, cellsize)
-
-    nfailed = len(failed)
-    nsucc = N - nfailed
-
-    result = 'in_memory/result'
-    if nsucc == 0:
-        arcpy.CreateFeatureclass_management('in_memory', 'result', 'POLYLINE', spatial_reference=crs)
-        arcpy.AddField_management(result, 'type', 'TEXT', field_length=10)
-        arcpy.AddField_management(result, 'grid_code', 'LONG')
-    else:
-        # Convert python list to ASCII
-        outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy[0, :, :],
-                                                               lowerleft, cellsize, value_to_nodata=nodatavalue))
-        arcpy.DefineProjection_management(outinnerraster, crs)
-        arcpy.RasterToPolyline_conversion(outinnerraster, result, background_value='NODATA', simplify='NO_SIMPLIFY')
-        arcpy.AddField_management(result, 'type', 'TEXT', field_length=10)
-
-        templines = 'in_memory/templine'
-        for k in range(1, nsucc):
-            outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(newrasternumpy[k, :, :],
-                                                                   lowerleft, cellsize, value_to_nodata=nodatavalue))
-            arcpy.DefineProjection_management(outinnerraster, crs)
-            arcpy.RasterToPolyline_conversion(outinnerraster, templines, background_value='NODATA', simplify='NO_SIMPLIFY')
-            arcpy.Append_management(templines, result, schema_type = 'NO_TEST')
-
-        arcpy.CalculateField_management(result, 'type', '"Real"')
-
-    # Process failed streams using shortest path strategy
-    if nfailed > 0:
-
-        arcpy.AddMessage("Tracing imitated counterpart streams. IDs: " + str(failed))
-
-        startlyr = 'startlyr'
-        arcpy.MakeFeatureLayer_management(startpts, startlyr)
-        endlyr = 'endlyr'
-        arcpy.MakeFeatureLayer_management(endpts, endlyr)
-        i = 0
-        k = 0
-        for row in arcpy.SearchCursor(instreams_crop):
-            id = row.getValue(inIDfield)
-            if id in failed:
-
-                arcpy.AddMessage("ID =  " + str(id) + ' (' + str(k+1) + " from " + str(nfailed) + ')')
-
-                arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(id))
-                arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(id))
-                arcpy.SelectLayerByAttribute_management(endlyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(id))
-                euc = arcpy.NumPyArrayToRaster(eucs[i,:,:], lowerleft, cellsize)
-                arcpy.DefineProjection_management(euc, crs)
-
-                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
-                                                           arcpy.sa.RemapRange([[0, deviation, penalty],
-                                                                                [deviation,euc.maximum,'NODATA']]))
-
-                strs = arcpy.sa.Reclassify(inraster, "value", arcpy.sa.RemapRange([[0,minacc,'NODATA'],[minacc,MAXACC,1]]))
-
-                cost = euc * arcpy.sa.ExtractByMask(strs, euc_mask)
-
-                arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demRaster), cost, 'MINIMUM')
-
-                backlink = arcpy.sa.CostBackLink(startlyr, cost)
-                costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
-
-                if arcpy.sa.IsNull(costpath).minimum == 0:
-                    costlines = 'in_memory/costlines'
-                    arcpy.RasterToPolyline_conversion(costpath + 1, costlines,
-                                                      background_value='NODATA',
-                                                      simplify='NO_SIMPLIFY')
-                    arcpy.CalculateField_management(costlines, 'grid_code', id)
-                    arcpy.Append_management(costlines, result, schema_type = 'NO_TEST')
-
-                k += 1
-
-            i += 1
-
-        reslyr = 'reslyr'
-        arcpy.MakeFeatureLayer_management(result, reslyr)
-        arcpy.SelectLayerByAttribute_management(reslyr, 'NEW_SELECTION', 'type is null')
-        arcpy.CalculateField_management(reslyr, 'type', '"Imitating"')
-
-    arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
-
-    # ensure right direction
-    arcpy.AddMessage('Ensuring right direction of counterpart streams...')
-
-    with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
-        for row in rows:
-            line = row[0].getPart(0)
-            count_start = [line[0].X, line[0].Y]
-            id = row[1]
-
-            hydro_start = startxy[ids.index(id)]
-            hydro_end = endxy[ids.index(id)]
-
-            if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
-                row[0] = FlipLine(line)
-                rows.updateRow(row)
-
-    arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
 
 if __name__ == "__main__":
     try:
