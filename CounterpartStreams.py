@@ -384,7 +384,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 id = row[1]
 
                 idx = numpy.where(ordids == id)[0].tolist()[0]
-                
+
                 hydro_start = startxy[idx]
                 hydro_end = endxy[idx]
 
@@ -438,25 +438,32 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
 
-    flt = numpy.logical_and(ins != nears, dist <= cellsize)
+    ordids = None
+    ordnears = None
 
-    depids = ids[ins[flt] - 1]
-    depnears = ids[nears[flt] - 1]
+    if len(ids) == 1:
+        ordids = ids
+        ordnears = numpy.asarray([-1])
+    else:
+        flt = numpy.logical_and(ins != nears, dist <= cellsize)
 
-    # construct the order
-    flt2 = numpy.logical_and(ins != nears, dist > cellsize)
-    ordids = ids[ins[flt2] - 1]
-    ordnears = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
+        depids = ids[ins[flt] - 1]
+        depnears = ids[nears[flt] - 1]
 
-    arcpy.AddMessage(ordids)
-    arcpy.AddMessage(ordnears)
+        # construct the order
+        flt2 = numpy.logical_and(ins != nears, dist > cellsize)
+        ordids = ids[ins[flt2] - 1]
+        ordnears = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
 
-    while(len(depnears) > 0):
-        ord = numpy.logical_not(numpy.in1d(depnears, depids))
-        ordids = numpy.append(ordids, depids[ord])
-        ordnears = numpy.append(ordnears, depnears[ord])
-        depids = depids[numpy.logical_not(ord)]
-        depnears = depnears[numpy.logical_not(ord)]
+        arcpy.AddMessage(ordids)
+        arcpy.AddMessage(ordnears)
+
+        while(len(depnears) > 0):
+            ord = numpy.logical_not(numpy.in1d(depnears, depids))
+            ordids = numpy.append(ordids, depids[ord])
+            ordnears = numpy.append(ordnears, depnears[ord])
+            depids = depids[numpy.logical_not(ord)]
+            depnears = depnears[numpy.logical_not(ord)]
 
     # Tracing stream lines
     arcpy.AddMessage("Tracing counterpart streams...")
