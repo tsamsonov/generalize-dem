@@ -191,7 +191,7 @@ def set_values(features, field, values):
     return features
 
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
-                   ids, ordids, ordnears, braidids, braidnears, lowerleft, cellsize, crs, outstreams):
+                   ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams):
 
     try:
         global MAXACC
@@ -259,72 +259,88 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             endneigh = get_neighborhood(iend, jend, radius, cellsize, ni, nj)
             startneigh = get_neighborhood(istart, jstart, radius, cellsize, ni, nj)
 
-            depid = ordnears[k]
-            isdep = False
-            dep = []
-            if depid != -1:
-                isdep = True
-                dep = streams[numpy.where(ordids == depid)[0].tolist()[0]]
+            endid = ordends[k]
+            enddep = False
+
+            endstr = []
+            if endid != -1:
+                enddep = True
+                endstr = streams[numpy.where(ordids == endid)[0].tolist()[0]]
                 for cell in endneigh:
-                    if cell in dep:
+                    if cell in endstr:
                         endneigh = get_neighborhood(cell[0], cell[1], radius, cellsize, ni, nj)
+                        break
+
+            startid = ordstarts[k]
+            startdep = False
+
+            startstr = []
+            if startid != -1:
+                startdep = True
+                startstr = streams[numpy.where(ordids == startid)[0].tolist()[0]]
+                for cell in startneigh:
+                    if cell in startstr:
+                        startneigh = get_neighborhood(cell[0], cell[1], radius, cellsize, ni, nj)
                         break
 
             arcpy.AddMessage("ID = " + str(ordids[k]) + ' (' + str(k + 1) + " from " + str(n) + ')')
 
             stream = []
-            weight = float('Inf')
-            for (i, j) in startneigh:
-                if  inraster[i, j] > minacc:
-                    s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
-                    ncells = len(e)
+            extend = False
 
-                    if ncells > 0 and max(e) <= deviation:
-                        l = 0
-                        cur = s[l]
-                        startstream = []
-                        while cur in startneigh:
-                            startstream.append(cur)
-                            l += 1
-                            if (l < ncells):
-                                cur = s[l]
-                            else:
+            if not startdep:
+                weight = float('Inf')
+                for (i, j) in startneigh:
+                    if  inraster[i, j] > minacc:
+                        s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
+                        ncells = len(e)
+
+                        if ncells > 0 and max(e) <= deviation:
+                            l = 0
+                            cur = s[l]
+                            startstream = []
+                            while cur in startneigh:
+                                startstream.append(cur)
+                                l += 1
+                                if (l < ncells):
+                                    cur = s[l]
+                                else:
+                                    break
+
+                            nstart = l-1
+
+                            L = path_length(startstream) + 1
+
+                            E = sum(e[0:nstart]) / (cellsize * L)
+                            D = euc_distance((i, j), startneigh[0]) / L
+                            w = math.sqrt(E + 1) * (D + 1)
+                            if w < weight:
+                                stream = s
+                                weight = w
+                extend = True
+
+                if len(stream) > 0:
+
+                    if enddep:
+                        nl = len(stream)
+
+                        for i in range(nl):
+                            if (stream[i] in endstr):
+                                nl = i + 1
+                                extend = False
                                 break
 
-                        nstart = l-1
+                        if not extend:
+                            streams.append(stream[:nl])
+                            types.append('Stream')
 
-                        L = path_length(startstream) + 1
-
-                        E = sum(e[0:nstart]) / (cellsize * L)
-                        D = euc_distance((i, j), startneigh[0]) / L
-                        w = math.sqrt(E + 1) * (D + 1)
-                        if w < weight:
-                            stream = s
-                            weight = w
-            extend = True
-
-            if len(stream) > 0:
-
-                if isdep:
-                    nl = len(stream)
-
-                    for i in range(nl):
-                        if (stream[i] in dep):
-                            nl = i + 1
-                            extend = False
-                            break
-
-                    if not extend:
-                        streams.append(stream[:nl])
+                    else:
+                        streams.append(stream)
                         types.append('Stream')
+                        extend = False
 
                 else:
-                    streams.append(stream)
-                    types.append('Stream')
                     extend = False
-
-            else:
-                extend = False
 
             if (len(stream) == 0) or extend:
 
@@ -376,11 +392,17 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 path = list(map(tuple, cells[idx, :]))
 
-                if isdep and not ordids[k] in braidids:
+                if startdep:
                     nl = len(path)
-
                     for i in range(nl):
-                        if path[i] in dep:
+                        if path[i] not in startstr:
+                            nl = i - 1
+                            path = path[nl:]
+                            break
+                if enddep:
+                    nl = len(path)
+                    for i in range(1, nl):
+                        if path[i] in endstr:
                             nl = i + 1
                             break
 
@@ -398,7 +420,23 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
         # Process braided streams
 
-        
+        # for b in range(len(braidids)):
+        #     braidid = braidids[b]
+        #     braidnear = braidnears[b]
+        #
+        #     k = numpy.where(ordids == braidid)[0].tolist()[0]
+        #     kp = numpy.where(ordids == braidnear)[0].tolist()[0]
+        #     kd = numpy.where(ordids == ordnears[k])[0].tolist()[0]
+        #
+        #     braid = streams[k]
+        #     parent = streams[kp]
+        #     endstr = streams[kd]
+        #
+        #     arcpy.AddMessage(k)
+        #     arcpy.AddMessage(kp)
+        #     arcpy.AddMessage(kd)
+        #
+        #     l = numpy.where(ordnears)
 
 
         outraster = None
@@ -488,13 +526,12 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     # Calculate distance to determine hierarchy
     end_tbl = 'in_memory/end_tbl'
     arcpy.GenerateNearTable_analysis(endpts, instreams_crop, end_tbl, closest=False, closest_count=2)
-    ins_end = get_values(end_tbl, 'IN_FID')
+    ins = get_values(end_tbl, 'IN_FID')
     nears_end = get_values(end_tbl, 'NEAR_FID')
     dist_end = get_values(end_tbl, 'NEAR_DIST')
 
     start_tbl = 'in_memory/start_tbl'
     arcpy.GenerateNearTable_analysis(startpts, instreams_crop, start_tbl, closest=False, closest_count=2)
-    ins_start = get_values(start_tbl, 'IN_FID')
     nears_start = get_values(start_tbl, 'NEAR_FID')
     dist_start = get_values(start_tbl, 'NEAR_DIST')
 
@@ -502,11 +539,9 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
 
-    ordids = None
-    ordends = None
-    ordstarts = None
-    braidids = []
-    braidnears = []
+    ordids = numpy.empty(0, dtype=numpy.int16)
+    ordends = numpy.empty(0, dtype=numpy.int16)
+    ordstarts = numpy.empty(0, dtype=numpy.int16)
 
     if len(ids) == 1:
         ordids = ids
@@ -515,47 +550,50 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     else:
 
         # remove self-distances
-        flt = ins_end != nears_end
-        ins_end = ins_end[flt]
+        flt = ins != nears_end
         nears_end = nears_end[flt]
         dist_end = dist_end[flt]
 
-        flt = ins_start != nears_start
-        ins_start = ins_start[flt]
+        flt = ins != nears_start
         nears_start = nears_start[flt]
         dist_start = dist_start[flt]
 
-        # find dependent on ends
-        flt1 = dist_end <= cellsize
-        depids = ids[ins_end[flt1] - 1]
-        depnears = ids[nears_end[flt1] - 1]
+        depends = ids[nears_end - 1]
+        depstarts = ids[nears_start - 1]
 
-        # find dependent on starts
-        flt2 = dist_start <= cellsize
-        braidids = ids[ins_end[flt2] - 1]
-        braidnears = ids[nears_start[flt2] - 1]
+        depends[dist_end > cellsize] = -1
+        depstarts[dist_start > cellsize] = -1
 
-        # find independent on ends
-        flt3 = dist_end > cellsize
-        ordids = ids[ins_end[flt3] - 1]
-        ordends = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
+        flt = numpy.logical_and(depends == -1, depstarts == -1)
+        # ordids = ids[flt]
+        # ordends = numpy.full(len(ordids), -1).astype(int)
+        # ordstarts = numpy.full(len(ordids), -1).astype(int)
 
-        arcpy.AddMessage('INDEPENDENT STREAMS: ' + str(ordids))
-        arcpy.AddMessage('BRAIDED STREAMS/CHANNELS (parent, braid): ' + str(zip(braidnears, braidids)))
+        arcpy.AddMessage('INDEPENDENT STREAMS: ' + str(ids[flt]))
+        arcpy.AddMessage('BRAIDED STREAMS/CHANNELS (parent, braid): ' + str(zip(depstarts[depstarts != -1], ids[depstarts != -1])))
 
-        while(len(depnears) > 0):
-            ord = numpy.logical_not(numpy.in1d(depnears, depids))
+        depids = ids.copy()
+
+        while(len(depends) > 0):
+            ord = numpy.logical_and(numpy.logical_not(numpy.in1d(depends, depids)),
+                                    numpy.logical_not(numpy.in1d(depstarts, depids)))
+
             ordids = numpy.append(ordids, depids[ord])
-            ordends = numpy.append(ordends, depnears[ord])
-            depids = depids[numpy.logical_not(ord)]
-            depnears = depnears[numpy.logical_not(ord)]
+            ordends = numpy.append(ordends, depends[ord])
+            ordstarts = numpy.append(ordstarts, depstarts[ord])
+
+            not_ord = numpy.logical_not(ord)
+
+            depids = depids[not_ord]
+            depends = depends[not_ord]
+            depstarts = depstarts[not_ord]
 
         # return
 
     # Tracing stream lines
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
-                   startpts, endpts, ids, ordids, ordends, braidids, braidnears, lowerleft, cellsize, crs, outstreams)
+                   startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams)
 
     return
 
