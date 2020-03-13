@@ -300,25 +300,24 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                             weight = w
 
             if len(stream) > 0:
-                streams.append(stream)
+
+                if isdep:
+                    nl = len(stream)
+
+                    for i in range(nl):
+                        if (stream[i] in dep):
+                            nl = i + 1
+                            break
+
+                    streams.append(stream[:nl])
+                    
+                else:
+                    streams.append(stream)
+
                 types.append('Stream')
 
             else:
                 arcpy.AddMessage("Using shortest path strategy")
-
-                # startlyr = 'startlyr'
-                # arcpy.MakeFeatureLayer_management(startpts, startlyr)
-                # endlyr = 'endlyr'
-                # arcpy.MakeFeatureLayer_management(endpts, endlyr)
-
-
-                # arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
-                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
-                # arcpy.SelectLayerByAttribute_management(endlyr, 'NEW_SELECTION',
-                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
-
-                # arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
-                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
 
                 npstart = numpy.full((ni, nj), -1).astype(int)
                 npstart[startneigh[0]] = ordids[k]
