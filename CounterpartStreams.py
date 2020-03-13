@@ -256,6 +256,17 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             endneigh = get_neighborhood(iend, jend, radius, cellsize, ni, nj)
             startneigh = get_neighborhood(istart, jstart, radius, cellsize, ni, nj)
 
+            depid = ordnears[k]
+            isdep = False
+            dep = []
+            if depid != -1:
+                isdep = True
+                dep = streams[numpy.where(ordids == depid)[0].tolist()[0]]
+                for cell in endneigh:
+                    if cell in dep:
+                        endneigh = get_neighborhood(cell[0], cell[1], radius, cellsize, ni, nj)
+                        break
+
             arcpy.AddMessage("ID = " + str(ordids[k]) + ' (' + str(k + 1) + " from " + str(n) + ')')
 
             stream = []
@@ -295,17 +306,30 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             else:
                 arcpy.AddMessage("Using shortest path strategy")
 
-                startlyr = 'startlyr'
-                arcpy.MakeFeatureLayer_management(startpts, startlyr)
-                endlyr = 'endlyr'
-                arcpy.MakeFeatureLayer_management(endpts, endlyr)
+                # startlyr = 'startlyr'
+                # arcpy.MakeFeatureLayer_management(startpts, startlyr)
+                # endlyr = 'endlyr'
+                # arcpy.MakeFeatureLayer_management(endpts, endlyr)
 
-                arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
-                arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
-                arcpy.SelectLayerByAttribute_management(endlyr, 'NEW_SELECTION',
-                                                        '"' + inIDfield + '" = ' + str(ordids[k]))
+
+                # arcpy.SelectLayerByAttribute_management(startlyr, 'NEW_SELECTION',
+                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
+                # arcpy.SelectLayerByAttribute_management(endlyr, 'NEW_SELECTION',
+                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
+
+                # arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
+                #                                         '"' + inIDfield + '" = ' + str(ordids[k]))
+
+                npstart = numpy.full((ni, nj), -1).astype(int)
+                npstart[startneigh[0]] = ordids[k]
+                startlyr = arcpy.NumPyArrayToRaster(npstart, lowerleft, cellsize, value_to_nodata=-1)
+                arcpy.DefineProjection_management(startlyr, crs)
+
+                npend = numpy.full((ni, nj), -1).astype(int)
+                npend[endneigh[0]] = ordids[k]
+                endlyr = arcpy.NumPyArrayToRaster(npend, lowerleft, cellsize, value_to_nodata=-1)
+                arcpy.DefineProjection_management(endlyr, crs)
+
                 euc = arcpy.NumPyArrayToRaster(eucs[k, :, :], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
@@ -335,8 +359,19 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 idx = numpy.argsort(values)
 
-                stream = cells[idx, :]
-                streams.append(stream)
+                stream = list(map(tuple, cells[idx, :]))
+
+                if isdep:
+                    nl = len(stream)
+
+                    for i in range(nl):
+                        if (stream[i] in dep):
+                            nl = i + 1
+                            break
+
+                    streams.append(stream[:nl])
+                else:
+                    streams.append(stream)
 
                 types.append('Path')
 
