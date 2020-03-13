@@ -1,5 +1,5 @@
 # -*- coding: cp1251 -*-
-# Raster stream network generalization by Leonowicz-Jenny algorithm
+# Counterpart streams
 # 2020, Timofey Samsonov, Lomonosov Moscow State University
 import sys
 import arcpy
@@ -214,6 +214,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         instreamslyr = 'strlyr'
         arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
 
+        arcpy.AddMessage('CALCULATING EUCLIDEAN DISTANCE RASTERS...')
         for i in range(n):
             arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
                                                     '"' + inIDfield + '" = ' + str(ordids[i]))
@@ -239,6 +240,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         endxy = [endxy[i] for i in idx]
 
         extinraster = extend_array(inraster, 1, 1, 0)
+
+        arcpy.AddMessage("TRACING COUNTERPARTS...")
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
 
@@ -298,6 +301,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                         if w < weight:
                             stream = s
                             weight = w
+            extend = True
 
             if len(stream) > 0:
 
@@ -307,20 +311,32 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                     for i in range(nl):
                         if (stream[i] in dep):
                             nl = i + 1
+                            extend = False
                             break
 
-                    streams.append(stream[:nl])
-                    
+                    if not extend:
+                        streams.append(stream[:nl])
+                        types.append('Stream')
+
                 else:
                     streams.append(stream)
-
-                types.append('Stream')
+                    types.append('Stream')
+                    extend = False
 
             else:
-                arcpy.AddMessage("Using shortest path strategy")
+                extend = False
+
+            if (len(stream) == 0) or extend:
 
                 npstart = numpy.full((ni, nj), -1).astype(int)
-                npstart[startneigh[0]] = ordids[k]
+
+                if extend:
+                    npstart[stream[-1]] = ordids[k]
+                    arcpy.AddMessage("Extending by shortest path")
+                else:
+                    npstart[startneigh[0]] = ordids[k]
+                    arcpy.AddMessage("Using shortest path")
+
                 startlyr = arcpy.NumPyArrayToRaster(npstart, lowerleft, cellsize, value_to_nodata=-1)
                 arcpy.DefineProjection_management(startlyr, crs)
 
@@ -358,21 +374,24 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 idx = numpy.argsort(values)
 
-                stream = list(map(tuple, cells[idx, :]))
+                path = list(map(tuple, cells[idx, :]))
 
                 if isdep:
-                    nl = len(stream)
+                    nl = len(path)
 
                     for i in range(nl):
-                        if (stream[i] in dep):
+                        if (path[i] in dep):
                             nl = i + 1
                             break
-
-                    streams.append(stream[:nl])
+                    if extend:
+                        streams.append(stream + path[1:nl])
+                        types.append('Stream + Path')
+                    else:
+                        streams.append(path[:nl])
+                        types.append('Path')
                 else:
-                    streams.append(stream)
-
-                types.append('Path')
+                    streams.append(path)
+                    types.append('Path')
 
             arcpy.SetProgressorPosition(k)
 
@@ -403,13 +422,13 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                                               simplify='NO_SIMPLIFY')
             arcpy.Append_management(templines, result, schema_type='NO_TEST')
 
-        arcpy.AddField_management(result, 'type', 'TEXT', field_length=6)
+        arcpy.AddField_management(result, 'type', 'TEXT', field_length=16)
         result = set_values(result, 'type', types)
 
         arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
 
         # ensure right direction
-        arcpy.AddMessage('Ensuring right direction of counterpart streams...')
+        arcpy.AddMessage('ENSURING RIGHT DIRECTION...')
 
         with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
             for row in rows:
@@ -489,8 +508,7 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
         ordids = ids[ins[flt2] - 1]
         ordnears = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
 
-        arcpy.AddMessage(ordids)
-        arcpy.AddMessage(ordnears)
+        arcpy.AddMessage('INDEPENDENT STREAMS: ' + str(ordids))
 
         while(len(depnears) > 0):
             ord = numpy.logical_not(numpy.in1d(depnears, depids))
@@ -500,7 +518,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             depnears = depnears[numpy.logical_not(ord)]
 
     # Tracing stream lines
-    arcpy.AddMessage("Tracing counterpart streams...")
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
                    startpts, endpts, ids, ordids, ordnears, lowerleft, cellsize, crs, outstreams)
