@@ -405,39 +405,23 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                         if path[i] in endstr:
                             nl = i + 1
                             break
-
                     if extend:
                         streams.append(stream + path[1:nl])
-                        types.append('Stream + Path')
+                        types.append('Extended Stream')
                     else:
                         streams.append(path[:nl])
-                        types.append('Path')
+                        if startdep:
+                            types.append('Braid/Channel')
+                        else:
+                            types.append('Path')
                 else:
                     streams.append(path)
-                    types.append('Path')
+                    if startdep:
+                        types.append('Braid/Channel')
+                    else:
+                        types.append('Path')
 
             arcpy.SetProgressorPosition(k)
-
-        # Process braided streams
-
-        # for b in range(len(braidids)):
-        #     braidid = braidids[b]
-        #     braidnear = braidnears[b]
-        #
-        #     k = numpy.where(ordids == braidid)[0].tolist()[0]
-        #     kp = numpy.where(ordids == braidnear)[0].tolist()[0]
-        #     kd = numpy.where(ordids == ordnears[k])[0].tolist()[0]
-        #
-        #     braid = streams[k]
-        #     parent = streams[kp]
-        #     endstr = streams[kd]
-        #
-        #     arcpy.AddMessage(k)
-        #     arcpy.AddMessage(kp)
-        #     arcpy.AddMessage(kd)
-        #
-        #     l = numpy.where(ordnears)
-
 
         outraster = None
         nodatavalue = 0 if (min(ordids) > 0) else min(ordids) - 1
@@ -535,7 +519,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     nears_start = get_values(start_tbl, 'NEAR_FID')
     dist_start = get_values(start_tbl, 'NEAR_DIST')
 
-
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
 
@@ -565,9 +548,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
         depstarts[dist_start > cellsize] = -1
 
         flt = numpy.logical_and(depends == -1, depstarts == -1)
-        # ordids = ids[flt]
-        # ordends = numpy.full(len(ordids), -1).astype(int)
-        # ordstarts = numpy.full(len(ordids), -1).astype(int)
 
         arcpy.AddMessage('INDEPENDENT STREAMS: ' + str(ids[flt]))
         arcpy.AddMessage('BRAIDED STREAMS/CHANNELS (parent, braid): ' + str(zip(depstarts[depstarts != -1], ids[depstarts != -1])))
@@ -587,10 +567,6 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             depids = depids[not_ord]
             depends = depends[not_ord]
             depstarts = depstarts[not_ord]
-
-        # return
-
-    # Tracing stream lines
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
                    startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams)
