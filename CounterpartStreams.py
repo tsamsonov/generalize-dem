@@ -379,8 +379,12 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 if isdep:
                     nl = len(path)
 
+                    bypass = True if path[0] in dep else False
+
                     for i in range(nl):
-                        if (path[i] in dep):
+                        if (path[i] not in dep) and bypass:
+                            bypass = False
+                        elif (path[i] in dep) and not bypass:
                             nl = i + 1
                             break
                     if extend:
@@ -470,7 +474,7 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
 
     instreams_crop = 'in_memory/str_cropped'
     arcpy.Clip_analysis(in_streams, domain, instreams_crop)
-
+    ids = get_values(instreams_crop, inIDfield)
 
     # Get start and endpoints of rivers
     startpts = 'in_memory/startpts'
@@ -480,47 +484,74 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     arcpy.FeatureVerticesToPoints_management(instreams_crop, endpts, point_location = 'END')
 
     # Calculate distance to determine hierarchy
-    dist_lines = 'in_memory/dist_lines'
+    end_tbl = 'in_memory/end_tbl'
+    arcpy.GenerateNearTable_analysis(endpts, instreams_crop, end_tbl, closest=False, closest_count=2)
+    ins_end = get_values(end_tbl, 'IN_FID')
+    nears_end = get_values(end_tbl, 'NEAR_FID')
+    dist_end = get_values(end_tbl, 'NEAR_DIST')
 
-    arcpy.GenerateNearTable_analysis(endpts, instreams_crop, dist_lines, closest=False, closest_count=2)
-    ids = get_values(instreams_crop, inIDfield)
-    ins = get_values(dist_lines, 'IN_FID')
-    nears = get_values(dist_lines, 'NEAR_FID')
-    dist = get_values(dist_lines, 'NEAR_DIST')
+    start_tbl = 'in_memory/start_tbl'
+    arcpy.GenerateNearTable_analysis(startpts, instreams_crop, start_tbl, closest=False, closest_count=2)
+    ins_start = get_values(start_tbl, 'IN_FID')
+    nears_start = get_values(start_tbl, 'NEAR_FID')
+    dist_start = get_values(start_tbl, 'NEAR_DIST')
+
 
     # dependent are streams which endpoints are located
     # less or equal to cellsize from another
 
     ordids = None
-    ordnears = None
+    ordends = None
+    ordstarts = None
 
     if len(ids) == 1:
         ordids = ids
-        ordnears = numpy.asarray([-1])
+        ordends = numpy.asarray([-1])
+        ordstarts = numpy.asarray([-1])
     else:
-        flt = numpy.logical_and(ins != nears, dist <= cellsize)
 
-        depids = ids[ins[flt] - 1]
-        depnears = ids[nears[flt] - 1]
+        # remove self-distances
+        flt = ins_end != nears_end
+        ins_end = ins_end[flt]
+        nears_end = nears_end[flt]
+        dist_end = dist_end[flt]
 
-        # construct the order
-        flt2 = numpy.logical_and(ins != nears, dist > cellsize)
-        ordids = ids[ins[flt2] - 1]
-        ordnears = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
+        flt = ins_start != nears_start
+        ins_start = ins_start[flt]
+        nears_start = nears_start[flt]
+        dist_start = dist_start[flt]
+
+        # find dependent on ends
+        flt1 = dist_end <= cellsize
+        depids = ids[ins_end[flt1] - 1]
+        depnears = ids[nears_end[flt1] - 1]
+
+        # find dependent on starts
+        flt2 = dist_start <= cellsize
+        braidids = ids[ins_end[flt2] - 1]
+        braidnears = ids[nears_start[flt2] - 1]
+
+        # find independent on ends
+        flt3 = dist_end > cellsize
+        ordids = ids[ins_end[flt3] - 1]
+        ordends = numpy.full(len(ordids), -1).astype(int) # TODO: make this value more robust
 
         arcpy.AddMessage('INDEPENDENT STREAMS: ' + str(ordids))
+        arcpy.AddMessage('BRAIDED STREAMS/CHANNELS (parent, braid): ' + str(zip(braidnears, braidids)))
 
         while(len(depnears) > 0):
             ord = numpy.logical_not(numpy.in1d(depnears, depids))
             ordids = numpy.append(ordids, depids[ord])
-            ordnears = numpy.append(ordnears, depnears[ord])
+            ordends = numpy.append(ordends, depnears[ord])
             depids = depids[numpy.logical_not(ord)]
             depnears = depnears[numpy.logical_not(ord)]
+
+        return
 
     # Tracing stream lines
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
-                   startpts, endpts, ids, ordids, ordnears, lowerleft, cellsize, crs, outstreams)
+                   startpts, endpts, ids, ordids, ordends, lowerleft, cellsize, crs, outstreams)
 
     return
 
