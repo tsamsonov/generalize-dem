@@ -191,7 +191,7 @@ def set_values(features, field, values):
     return features
 
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
-                   ids, ordids, ordnears, lowerleft, cellsize, crs, outstreams):
+                   ids, ordids, ordnears, braidids, braidnears, lowerleft, cellsize, crs, outstreams):
 
     try:
         global MAXACC
@@ -376,17 +376,14 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 path = list(map(tuple, cells[idx, :]))
 
-                if isdep:
+                if isdep and not ordids[k] in braidids:
                     nl = len(path)
 
-                    bypass = True if path[0] in dep else False
-
                     for i in range(nl):
-                        if (path[i] not in dep) and bypass:
-                            bypass = False
-                        elif (path[i] in dep) and not bypass:
+                        if path[i] in dep:
                             nl = i + 1
                             break
+
                     if extend:
                         streams.append(stream + path[1:nl])
                         types.append('Stream + Path')
@@ -398,6 +395,11 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                     types.append('Path')
 
             arcpy.SetProgressorPosition(k)
+
+        # Process braided streams
+
+        
+
 
         outraster = None
         nodatavalue = 0 if (min(ordids) > 0) else min(ordids) - 1
@@ -503,6 +505,8 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     ordids = None
     ordends = None
     ordstarts = None
+    braidids = []
+    braidnears = []
 
     if len(ids) == 1:
         ordids = ids
@@ -546,12 +550,12 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             depids = depids[numpy.logical_not(ord)]
             depnears = depnears[numpy.logical_not(ord)]
 
-        return
+        # return
 
     # Tracing stream lines
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
-                   startpts, endpts, ids, ordids, ordends, lowerleft, cellsize, crs, outstreams)
+                   startpts, endpts, ids, ordids, ordends, braidids, braidnears, lowerleft, cellsize, crs, outstreams)
 
     return
 
