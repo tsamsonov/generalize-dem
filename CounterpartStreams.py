@@ -6,6 +6,7 @@ import arcpy
 import numpy
 import traceback
 import math
+import Utils
 
 MAXACC = 0
 
@@ -181,6 +182,16 @@ def FlipLine(Line):
 def get_values(features, field):
     return numpy.asarray([row[0] for row in arcpy.da.SearchCursor(features, field)])
 
+def get_coordinates(features):
+    lines = []
+    with arcpy.da.SearchCursor(features, "SHAPE@") as rows:
+        for row in rows:
+            coords = []
+            for pnt in row[0].getPart().next():
+                coords.append([pnt.X, pnt.Y])
+            lines.append(coords)
+    return lines
+
 def set_values(features, field, values):
     with arcpy.da.UpdateCursor(features, field) as rows:
         i = 0
@@ -189,6 +200,68 @@ def set_values(features, field, values):
             rows.updateRow(row)
             i += 1
     return features
+
+
+def cost_path(coords, distance, backlink, radius, destination):
+    back = {
+        0: (0, 0),
+        1: (1, 0),
+        2: (1, 1),
+        3: (0, 1),
+        4: (1, -1),
+        5: (0, -1),
+        6: (-1, -1),
+        7: (-1, 0),
+        8: (-1, 1)
+    }
+
+    desc = arcpy.Describe(distance)
+    lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
+    cellsize = desc.meanCellWidth
+    minx = lowerleft.X
+    miny = lowerleft.Y
+
+    npdist  = arcpy.RasterToNumPyArray(distance)
+    npback = arcpy.RasterToNumPyArray(backlink)
+
+    ni = npdist.shape[0]
+    nj = npdist.shape[1]
+
+    # idest = ni - math.trunc((destination[1] - miny) / cellsize) - 1
+    # jdest = math.trunc((destination[0] - minx) / cellsize)
+
+    # Generate compatibility raster
+
+    arcpy.AddMessage('Generating compatibility sets')
+    npcomp = [[set() for j in range(nj)] for i in range(ni)] # compatibility raster
+
+    arcpy.AddMessage('Empty sets created')
+
+    k = 0
+    for pnt in coords:
+
+        ip = ni - math.trunc((pnt[1] - miny) / cellsize) - 1
+        jp = math.trunc((pnt[0] - minx) / cellsize)
+
+        nb = get_neighborhood(ip, jp, radius, cellsize, ni, nj)
+
+        for (i, j) in nb:
+            npcomp[i][j] = npcomp[i][j].union([k])
+
+        k +=1
+
+    ij = destination
+    path = [ij]
+    type = npback[ij]
+    while type != 0:
+        shift = back[npback[ij]]
+        ij = (ij[0] + shift[0], ij[1] + shift[1])
+        path.append(ij)
+        type = npback[ij]
+
+    path.reverse()
+
+    return path
 
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
                    ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams):
@@ -235,6 +308,12 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         for row in arcpy.da.SearchCursor(endpts, ["SHAPE@XY"]):
             x, y = row[0]
             endxy.append([x, y])
+
+        geometries = get_coordinates(instreams)
+        if len(geometries) > 1:
+            geometries = geometries[idx]
+
+        arcpy.AddMessage(geometries)
 
         startxy = [startxy[i] for i in idx]
         endxy = [endxy[i] for i in idx]
@@ -295,7 +374,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                         s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
                         ncells = len(e)
 
-                        if ncells > 0 and max(e) <= deviation:
+                        if False: #ncells > 0 and Utils.frechet_dist(s, geometries[k]) <= deviation:
                             l = 0
                             cur = s[l]
                             startstream = []
@@ -364,7 +443,12 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 euc = arcpy.NumPyArrayToRaster(eucs[k, :, :], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
-                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
+                # euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
+                #                                            arcpy.sa.RemapRange([[0, deviation, penalty],
+                #                                                                 [deviation, euc.maximum,
+                #                                                                  'NODATA']]))
+
+                euc_mask = arcpy.sa.Reclassify(euc, "value",
                                                            arcpy.sa.RemapRange([[0, deviation, penalty],
                                                                                 [deviation, euc.maximum,
                                                                                  'NODATA']]))
@@ -372,25 +456,38 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 strs = arcpy.sa.Reclassify(in_raster, "value",
                                            arcpy.sa.RemapRange([[0, minacc, 'NODATA'], [minacc, MAXACC, 1]]))
 
-                cost = euc * arcpy.sa.ExtractByMask(strs, euc_mask)
+                cost = arcpy.sa.ExtractByMask(strs, euc_mask) #* euc
 
-                arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
+                # arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
+                arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
+
+                # arcpy.env.workspace = "X:/DEMGEN/"
+                # if arcpy.Exists("cost.tif"):
+                #     arcpy.Delete_management("cost.tif")
+                #
+                # cost.save('cost.tif')
 
                 backlink = arcpy.sa.CostBackLink(startlyr, cost)
-                costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
                 costdist = arcpy.sa.CostDistance(startlyr, cost)
 
-                nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
-                npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
+                # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                cellidx = numpy.where(nppath >= 0)
-                cells = numpy.argwhere(nppath >= 0)
+                path = cost_path(geometries[k], costdist, backlink, radius, endneigh[0])
 
-                values = npdist[cellidx]
+                arcpy.AddMessage('PATH created!')
+                arcpy.AddMessage(path)
 
-                idx = numpy.argsort(values)
-
-                path = list(map(tuple, cells[idx, :]))
+                # nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
+                # npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
+                #
+                # cellidx = numpy.where(nppath >= 0)
+                # cells = numpy.argwhere(nppath >= 0)
+                #
+                # values = npdist[cellidx]
+                #
+                # idx = numpy.argsort(values)
+                #
+                # path = list(map(tuple, cells[idx, :]))
 
                 if startdep:
                     nl = len(path)
@@ -428,11 +525,16 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
         N = len(streams)
 
+        arcpy.AddMessage(N)
+
         if (N > 0):
             outraster = numpy.full((N, ni, nj), nodatavalue)
             for l in range(N):
                 for ncells in range(len(streams[l])):
                     outraster[l, streams[l][ncells][0], streams[l][ncells][1]] = ordids[l]
+
+        arcpy.AddMessage(numpy.amax(outraster))
+        arcpy.AddMessage(numpy.amin(outraster))
 
         outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(outraster[0, :, :],
                                                                lowerleft, cellsize, value_to_nodata=nodatavalue))
@@ -451,6 +553,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             arcpy.Append_management(templines, result, schema_type='NO_TEST')
 
         arcpy.AddField_management(result, 'type', 'TEXT', field_length=16)
+
+        arcpy.AddMessage(int(arcpy.GetCount_management(result).getOutput(0)))
         result = set_values(result, 'type', types)
 
         arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
