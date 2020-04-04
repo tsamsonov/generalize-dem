@@ -86,6 +86,25 @@ def extend_array(array, nx, ny, value):
 
     return extarray
 
+def get_window(i, j, ni, nj, size=3):
+    w = int((size - 1) / 2)
+    l = range(-w, w + 1)  # calculate kernel indices
+    idx = numpy.meshgrid(l, l)  # generate coordinate matrices
+
+    x = idx[0] + i
+    y = idx[1] + j
+
+    flt_xy = (x >= 0) * (x < ni) * (y >= 0) * (y < nj)
+
+    x = x[flt_xy]
+    y = y[flt_xy]
+
+    order = numpy.argsort(((x - i) ** 2 + (y - j) ** 2) ** 0.5)
+
+    neigh = list(map(lambda a, b: (a, b), x[order], y[order]))
+
+    return neigh
+
 def get_neighborhood(i, j, radius, cellsize, ni, nj):
     w = int(math.ceil(radius / cellsize))  # calculate kernel radius (rounded)
     l = range(-w, w + 1)  # calculate kernel indices
@@ -201,16 +220,40 @@ def set_values(features, field, values):
             i += 1
     return features
 
+def get_neighbor(path, npdist, npcomp, ni, nj, i, j):
+
+    win = get_window(i, j, ni, nj)
+
+    comp = npcomp[i][j]
+    curmin = min(comp)
+
+    win = set(win) - set(path)
+
+    d = float("inf")
+    selected = None
+    for cell in win:
+        nextcomp = npcomp[cell[0]][cell[1]]
+        nextmin = min(nextcomp)
+        if (nextmin > curmin):
+            continue
+
+        if (set(range(nextmin, curmin + 1)).issubset(nextcomp)):
+            dnext = npdist[cell]
+            if (dnext < d):
+                d = dnext
+                selected = cell
+    return selected
+
 
 def cost_path(coords, distance, backlink, radius, destination):
     back = {
-        0: (0, 0),
-        1: (1, 0),
-        2: (1, 1),
-        3: (0, 1),
+        0: (0,  0),
+        1: (1,  0),
+        2: (1,  1),
+        3: (0,  1),
         4: (1, -1),
         5: (0, -1),
-        6: (-1, -1),
+        6: (-1,-1),
         7: (-1, 0),
         8: (-1, 1)
     }
@@ -239,7 +282,6 @@ def cost_path(coords, distance, backlink, radius, destination):
 
     k = 0
     for pnt in coords:
-
         ip = ni - math.trunc((pnt[1] - miny) / cellsize) - 1
         jp = math.trunc((pnt[0] - minx) / cellsize)
 
@@ -253,11 +295,18 @@ def cost_path(coords, distance, backlink, radius, destination):
     ij = destination
     path = [ij]
     type = npback[ij]
+    k = 1
+    arcpy.AddMessage('Tracing')
     while type != 0:
-        shift = back[npback[ij]]
-        ij = (ij[0] + shift[0], ij[1] + shift[1])
+        # shift = back[npback[ij]]
+        # ij = (ij[0] + shift[0], ij[1] + shift[1])
+        ij = get_neighbor(path, npdist, npcomp, ni, nj, ij[0], ij[1])
+        if ij == None:
+            break
         path.append(ij)
         type = npback[ij]
+        arcpy.AddMessage('Point added: ' + str(k))
+        k += 1
 
     path.reverse()
 
@@ -555,27 +604,27 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         arcpy.AddField_management(result, 'type', 'TEXT', field_length=16)
 
         arcpy.AddMessage(int(arcpy.GetCount_management(result).getOutput(0)))
-        result = set_values(result, 'type', types)
+        # result = set_values(result, 'type', types)
 
         arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
 
         # ensure right direction
         arcpy.AddMessage('ENSURING RIGHT DIRECTION...')
 
-        with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
-            for row in rows:
-                line = row[0].getPart(0)
-                count_start = [line[0].X, line[0].Y]
-                id = row[1]
-
-                idx = numpy.where(ordids == id)[0].tolist()[0]
-
-                hydro_start = startxy[idx]
-                hydro_end = endxy[idx]
-
-                if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
-                    row[0] = FlipLine(line)
-                    rows.updateRow(row)
+        # with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
+        #     for row in rows:
+        #         line = row[0].getPart(0)
+        #         count_start = [line[0].X, line[0].Y]
+        #         id = row[1]
+        #
+        #         idx = numpy.where(ordids == id)[0].tolist()[0]
+        #
+        #         hydro_start = startxy[idx]
+        #         hydro_end = endxy[idx]
+        #
+        #         if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
+        #             row[0] = FlipLine(line)
+        #             rows.updateRow(row)
 
         arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
 
