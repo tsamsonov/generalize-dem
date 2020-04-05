@@ -86,24 +86,28 @@ def extend_array(array, nx, ny, value):
 
     return extarray
 
-def get_window(i, j, ni, nj, size=3):
+def get_window(ij, ni, nj, size=3):
     w = int((size - 1) / 2)
     l = range(-w, w + 1)  # calculate kernel indices
     idx = numpy.meshgrid(l, l)  # generate coordinate matrices
 
-    x = idx[0] + i
-    y = idx[1] + j
+    x = idx[0] + ij[0]
+    y = idx[1] + ij[1]
 
-    flt_xy = (x >= 0) * (x < ni) * (y >= 0) * (y < nj)
+    flt_xy = (x >= 0) * (x < ni) * (y >= 0) * (y < nj) #* numpy.logical_or(x != ij[0], y != ij[1])
 
     x = x[flt_xy]
     y = y[flt_xy]
 
-    order = numpy.argsort(((x - i) ** 2 + (y - j) ** 2) ** 0.5)
+    npdist = ((x - ij[0]) ** 2 + (y - ij[1]) ** 2) ** 0.5
+
+    order = numpy.argsort(npdist)
+
+    dist = npdist[order].tolist()
 
     neigh = list(map(lambda a, b: (a, b), x[order], y[order]))
 
-    return neigh
+    return neigh[1:], dist[1:]
 
 def get_neighborhood(i, j, radius, cellsize, ni, nj):
     w = int(math.ceil(radius / cellsize))  # calculate kernel radius (rounded)
@@ -220,7 +224,7 @@ def set_values(features, field, values):
             i += 1
     return features
 
-def get_neighbor(path, npdist, npcomp, ni, nj, i, j):
+def get_neighbor(path, npdist, npcomp, ni, nj, i, j, minimax, prohibited):
 
     win = get_window(i, j, ni, nj)
 
@@ -232,20 +236,85 @@ def get_neighbor(path, npdist, npcomp, ni, nj, i, j):
     d = float("inf")
     selected = None
     for cell in win:
-        nextcomp = npcomp[cell[0]][cell[1]]
-        nextmin = min(nextcomp)
-        if (nextmin > curmin):
-            continue
+        if cell not in prohibited:
+            nextcomp = npcomp[cell[0]][cell[1]]
+            nextmin = min(nextcomp)
+            if (nextmin > curmin):
+                continue
 
-        if (set(range(nextmin, curmin + 1)).issubset(nextcomp)):
-            dnext = npdist[cell]
-            if (dnext < d):
-                d = dnext
-                selected = cell
+            if (minimax in nextcomp):
+                dnext = npdist[cell]
+                if (dnext < d):
+                    d = dnext
+                    selected = cell
     return selected
 
+def invback(a, b):
 
-def cost_path(coords, distance, backlink, radius, destination):
+    offset = (a[0] - b[0], a[1] - b[1])
+
+    back = {
+        6: (-1, -1),
+        7: (-1, 0),
+        8: (-1, 1),
+        5: (0, -1),
+        0: (0, 0),
+        3: (0, 1),
+        4: (1, -1),
+        1: (1, 0),
+        2: (1, 1),
+    }
+
+    for k in range(9):
+        if back[k] == offset:
+            return k
+
+    return None
+
+def cost_distance(source, npcost, npcomp, cellsize, nodatavalue=-1):
+    visited = []
+    calculated = [source]
+
+    ni = npcost.shape[0]
+    nj = npcost.shape[1]
+
+    total = (npcost != nodatavalue).sum()
+
+    arcpy.AddMessage('Need to visit ' + str(total) + ' cells')
+
+    npdist = numpy.full((ni, nj), float('Inf'))
+    npback = numpy.full((ni, nj), nodatavalue)
+
+    npdist[source] = 0
+    npback[source] = 0
+
+    while len(calculated) > 0:
+        newcalc = []
+        newdist = []
+        for cell in calculated:
+            celldist = npdist[cell]
+            nb, dist = get_window(cell, ni, nj)
+            for (ij, d) in zip(nb, dist):
+                if (ij not in visited) and (npcost[ij] != nodatavalue):
+                    accum_dist = celldist + d * npcost[ij]
+                    if accum_dist < npdist[ij]:
+                        npdist[ij] = accum_dist
+                        npback[ij] = invback(cell, ij)
+                        if (ij not in newcalc):
+                            newcalc.append(ij)
+                            newdist.append(accum_dist)
+                        else:
+                            newdist[newcalc.index(ij)] = accum_dist
+
+            visited.append(cell)
+        calculated = [ij for dist, ij in sorted(zip(newdist, newcalc))]
+        perc = 100 * float(len(visited)) / float(total)
+        arcpy.AddMessage('Percentage processed: ' + str(perc)) # TODO: correct estimate!
+
+    return npdist, npback
+
+
+def cost_path(coords, cost, radius, source, destination):
     back = {
         0: (0,  0),
         1: (1,  0),
@@ -258,17 +327,19 @@ def cost_path(coords, distance, backlink, radius, destination):
         8: (-1, 1)
     }
 
-    desc = arcpy.Describe(distance)
+    desc = arcpy.Describe(cost)
     lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
     cellsize = desc.meanCellWidth
     minx = lowerleft.X
     miny = lowerleft.Y
 
-    npdist  = arcpy.RasterToNumPyArray(distance)
-    npback = arcpy.RasterToNumPyArray(backlink)
+    # npdist  = arcpy.RasterToNumPyArray(distance)
+    # npback = arcpy.RasterToNumPyArray(backlink)
+    npcost = arcpy.RasterToNumPyArray(cost, nodata_to_value = -1)
 
-    ni = npdist.shape[0]
-    nj = npdist.shape[1]
+
+    ni = npcost.shape[0]
+    nj = npcost.shape[1]
 
     # idest = ni - math.trunc((destination[1] - miny) / cellsize) - 1
     # jdest = math.trunc((destination[0] - minx) / cellsize)
@@ -284,26 +355,57 @@ def cost_path(coords, distance, backlink, radius, destination):
     for pnt in coords:
         ip = ni - math.trunc((pnt[1] - miny) / cellsize) - 1
         jp = math.trunc((pnt[0] - minx) / cellsize)
-
         nb = get_neighborhood(ip, jp, radius, cellsize, ni, nj)
-
         for (i, j) in nb:
             npcomp[i][j] = npcomp[i][j].union([k])
-
         k +=1
+
+    arcpy.AddMessage('Calculating distance and backlink rasters')
+    npdist, npback = cost_distance(source, npcost, npcomp, cellsize)
 
     ij = destination
     path = [ij]
     type = npback[ij]
-    k = 1
+    k = 0
+
     arcpy.AddMessage('Tracing')
+    # minimax = [min(npcomp[ij[0]][ij[1]])]
+    # kprob = None
+    # minprob = None
+    # prohibited = []
+    # problem = False
+
     while type != 0:
-        # shift = back[npback[ij]]
-        # ij = (ij[0] + shift[0], ij[1] + shift[1])
-        ij = get_neighbor(path, npdist, npcomp, ni, nj, ij[0], ij[1])
-        if ij == None:
-            break
+        shift = back[npback[ij]]
+        ij = (ij[0] + shift[0], ij[1] + shift[1])
+
+        # ij = get_neighbor(path, npdist, npcomp, ni, nj, ij[0], ij[1], minimax[k], prohibited)
+
+        # if ijback != ij:
+        #     kprob = k - 1
+        #
+        # if ij == None:
+        #     minprob = minimax[k-1]
+        #     for l in range(kprob, k):
+        #         prohibited.append(path.pop())
+        #         minimax.pop()
+        #     problem = True
+        #     k = kprob
+        #     ij = path[-1]
+        #     continue
+
         path.append(ij)
+        # nextcomp = npcomp[ij[0]][ij[1]]
+        #
+        # nextmini = minimax[-1]
+        # while (nextmini - 1) in nextcomp:
+        #     nextmini = nextmini - 1
+        # minimax.append(nextmini)
+        #
+        # if (problem == True and minimax[-1] < minprob):
+        #     problem = False
+            # prohibited = []
+
         type = npback[ij]
         arcpy.AddMessage('Point added: ' + str(k))
         k += 1
@@ -516,12 +618,12 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 #
                 # cost.save('cost.tif')
 
-                backlink = arcpy.sa.CostBackLink(startlyr, cost)
-                costdist = arcpy.sa.CostDistance(startlyr, cost)
+                # backlink = arcpy.sa.CostBackLink(startlyr, cost)
+                # costdist = arcpy.sa.CostDistance(startlyr, cost)
 
                 # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                path = cost_path(geometries[k], costdist, backlink, radius, endneigh[0])
+                path = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
 
                 arcpy.AddMessage('PATH created!')
                 arcpy.AddMessage(path)
