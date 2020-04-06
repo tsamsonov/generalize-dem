@@ -299,8 +299,8 @@ def longgap(arr):
             return True
     return False
 
-def cost_distance(source, npcost, npcomp, nodatavalue=-1):
-    visited = []
+def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
+    # visited = []
     calculated = [source]
 
     ni = npcost.shape[0]
@@ -313,11 +313,15 @@ def cost_distance(source, npcost, npcomp, nodatavalue=-1):
     npdist = numpy.full((ni, nj), float('Inf'))
     npback = numpy.full((ni, nj), nodatavalue)
     npminimax = numpy.full((ni, nj), nodatavalue).astype(int)
-    npgap = numpy.zeros((ni, nj))
 
     npdist[source] = 0
     npback[source] = 0
     npminimax[source] = minimax(npcomp[source[0]][source[1]])
+
+    dead_cells = []
+    dead_dist = []
+
+    evil = False
 
     while len(calculated) > 0:
         newcalc = []
@@ -330,17 +334,39 @@ def cost_distance(source, npcost, npcomp, nodatavalue=-1):
             cell_minimax = npminimax[cell]
             cell_compat = npcomp[cell[0]][cell[1]]
 
+
+            # if cell == (41, 141):
+            #     arcpy.AddMessage('Evil point found!')
+            #     arcpy.AddMessage(celldist)
+            #     arcpy.AddMessage(nb)
+            #     arcpy.AddMessage(dist)
+            #     arcpy.AddMessage(cell_minimax)
+            #     arcpy.AddMessage(cell_compat)
+            #     evil = True
+
+
+            deads = 0
+
             for (ij, d) in zip(nb, dist):
-                if (ij not in visited) and (npcost[ij] != nodatavalue):
+                # if (ij not in visited) and (npcost[ij] != nodatavalue):
+                if (npcost[ij] != nodatavalue):
 
                     ijcomp = npcomp[ij[0]][ij[1]]
 
                     if len(ijcomp) < 1:
+                        if d < 2:
+                            deads+=1
                         incomp_moves += 1
+                        # if evil:
+                        #     arcpy.AddMessage(str(ij) + ' empty')
                         continue
 
                     if len(ijcomp.intersection(cell_compat)) == 0:
+                        if d < 2:
+                            deads += 1
                         incomp_moves += 1
+                        # if evil:
+                        #     arcpy.AddMessage(str(ij) + ' non-intersection')
                         continue
 
                     # if (cell_minimax not in ijcomp) and (longgap(cell_compat) or longgap(ijcomp)):
@@ -352,13 +378,20 @@ def cost_distance(source, npcost, npcomp, nodatavalue=-1):
                         #     arcpy.AddMessage(cell_minimax)
                         #     arcpy.AddMessage(cell_compat)
                         #     arcpy.AddMessage(ijcomp)
+                        if d < 2:
+                            deads += 1
                         incomp_moves += 1
+                        # if evil:
+                        #     arcpy.AddMessage(str(ij) + ' incompatible')
                         continue
 
                     accum_dist = celldist + d
                     if accum_dist < npdist[ij]:
                         npdist[ij] = accum_dist
                         npback[ij] = invback(cell, ij)
+
+                        # if evil:
+                        #     arcpy.AddMessage(str(ij) + ' replaced with ' + str(accum_dist))
 
                         # if minimax(ijcomp) != max(ijcomp):
                         if cell_minimax in ijcomp:
@@ -375,12 +408,25 @@ def cost_distance(source, npcost, npcomp, nodatavalue=-1):
 
                         moves += 1
 
-            visited.append(cell)
+                #     elif evil:
+                #         arcpy.AddMessage(str(ij) + ' not replaced')
+                # elif evil:
+                #     arcpy.AddMessage(str(ij) + ' with ' + str(npdist[ij]) + ' dist and ' + str(npback[ij]) + ' backlink bypassed')
+            # if evil:
+            #     sys.exit(0)
+            if (deads > 0):
+                dead_cells.append(cell)
+                dead_dist.append(celldist)
+            # visited.append(cell)
+            # if (cell == destination):
+            #     return npdist, npback
         calculated = [ij for dist, ij in sorted(zip(newdist, newcalc))]
-        perc = 100 * float(len(visited)) / float(total)
-        arcpy.AddMessage('Percentage processed: ' + str(perc)) # TODO: correct estimate!
-        arcpy.AddMessage('Successful / incompatible moves: ' + str(moves) + ' / ' + str(incomp_moves))
+        # perc = 100 * float(len(visited)) / float(total)
+        # arcpy.AddMessage('Percentage processed: ' + str(perc)) # TODO: correct estimate!
+        # arcpy.AddMessage('% / successful / incompatible: ' + str(round(perc, 1)) + ' / ' + str(moves) + ' / ' + str(incomp_moves))
 
+    arcpy.AddMessage(dead_cells)
+    arcpy.AddMessage(dead_dist)
     return npdist, npback
 
 
@@ -419,8 +465,6 @@ def cost_path(coords, cost, radius, source, destination):
     arcpy.AddMessage('Generating compatibility sets')
     npcomp = [[set() for j in range(nj)] for i in range(ni)] # compatibility raster
 
-    npnear = numpy.zeros((ni,nj)).astype(int)
-
     arcpy.AddMessage('Empty sets created')
 
     k = 0
@@ -433,7 +477,7 @@ def cost_path(coords, cost, radius, source, destination):
         k +=1
 
     arcpy.AddMessage('Calculating distance and backlink rasters')
-    npdist, npback = cost_distance(source, npcost, npcomp)
+    npdist, npback = cost_distance(source, npcost, npcomp, destination)
 
     ij = destination
     path = [ij]
@@ -484,7 +528,7 @@ def cost_path(coords, cost, radius, source, destination):
 
     path.reverse()
 
-    return path, npdist
+    return path, npdist, npback
 
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
                    ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams):
@@ -699,11 +743,15 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                path, npdist = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+                path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
 
                 ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
                 arcpy.DefineProjection_management(ras, crs)
                 ras.save('X:/DEMGEN/dist.tif')
+
+                ras = arcpy.NumPyArrayToRaster(npback, lowerleft, cellsize, value_to_nodata=-1)
+                arcpy.DefineProjection_management(ras, crs)
+                ras.save('X:/DEMGEN/back.tif')
 
                 arcpy.AddMessage('PATH created!')
                 arcpy.AddMessage(path)
