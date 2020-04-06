@@ -64,13 +64,27 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links,
         nj = len(hydro_coords)
 
         # find basic min j for each i
+        # minjays = [0]
+        # for i in range(ni):
+        #     minj = numpy.argmin(eucs[i, :])
+        #     for k in range (i, ni):
+        #         curj = numpy.argmin(eucs[k, :])
+        #         if  minj > curj:
+        #             minj = curj
+        #     minjays.append(minj)
+
         minjays = []
-        for i in range(ni):
-            minj = numpy.argmin(eucs[i, :])
-            for k in range (i, ni):
-                curj = numpy.argmin(eucs[k, :])
-                if  minj > curj:
-                    minj = curj
+        minj = 0
+        for i in range(0, ni):
+            found = False
+            for j in range(minj + 1, nj):
+                for k in range(i + 1, ni):
+                    if eucs[k, j] <= eucs[i, j]:
+                        minj = j-1
+                        found = True
+                        break
+                if found:
+                    break
             minjays.append(minj)
 
         # fill empty min j by connecting to nearest i
