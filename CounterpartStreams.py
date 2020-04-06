@@ -321,8 +321,6 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
     dead_cells = []
     dead_dist = []
 
-    evil = False
-
     while len(calculated) > 0:
         newcalc = []
         newdist = []
@@ -333,18 +331,6 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
             nb, dist = get_window(npcost, cell, ni, nj)
             cell_minimax = npminimax[cell]
             cell_compat = npcomp[cell[0]][cell[1]]
-
-
-            # if cell == (41, 141):
-            #     arcpy.AddMessage('Evil point found!')
-            #     arcpy.AddMessage(celldist)
-            #     arcpy.AddMessage(nb)
-            #     arcpy.AddMessage(dist)
-            #     arcpy.AddMessage(cell_minimax)
-            #     arcpy.AddMessage(cell_compat)
-            #     evil = True
-
-
             deads = 0
 
             for (ij, d) in zip(nb, dist):
@@ -357,32 +343,18 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
                         if d < 2:
                             deads+=1
                         incomp_moves += 1
-                        # if evil:
-                        #     arcpy.AddMessage(str(ij) + ' empty')
                         continue
 
                     if len(ijcomp.intersection(cell_compat)) == 0:
                         if d < 2:
                             deads += 1
                         incomp_moves += 1
-                        # if evil:
-                        #     arcpy.AddMessage(str(ij) + ' non-intersection')
                         continue
 
-                    # if (cell_minimax not in ijcomp) and (longgap(cell_compat) or longgap(ijcomp)):
                     if (cell_minimax not in ijcomp) and ((max(cell_compat) != minimax(cell_compat)) or (minimax(ijcomp) != max(ijcomp))):
-                    # if (cell_minimax not in ijcomp) or (not ijcomp.issubset(cell_compat)):
-                    # if (cell_minimax not in ijcomp) and (max(cell_compat) != minimax(cell_compat)):
-                    # if (cell_minimax not in ijcomp) and (minimax(ijcomp) != max(ijcomp)):
-                        # if (celldist > 142818) and (d < 2):
-                        #     arcpy.AddMessage(cell_minimax)
-                        #     arcpy.AddMessage(cell_compat)
-                        #     arcpy.AddMessage(ijcomp)
                         if d < 2:
                             deads += 1
                         incomp_moves += 1
-                        # if evil:
-                        #     arcpy.AddMessage(str(ij) + ' incompatible')
                         continue
 
                     accum_dist = celldist + d
@@ -390,16 +362,10 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
                         npdist[ij] = accum_dist
                         npback[ij] = invback(cell, ij)
 
-                        # if evil:
-                        #     arcpy.AddMessage(str(ij) + ' replaced with ' + str(accum_dist))
-
-                        # if minimax(ijcomp) != max(ijcomp):
                         if cell_minimax in ijcomp:
                             npminimax[ij] = minimax(set(range(cell_minimax, max(ijcomp) + 1)).intersection(ijcomp))
                         else:
                             npminimax[ij] = max(ijcomp)
-                            # npminimax[ij] = minimax(set(range(min(ijcomp), max(ijcomp) + 1)).intersection(ijcomp))
-
                         if (ij not in newcalc):
                             newcalc.append(ij)
                             newdist.append(accum_dist)
@@ -408,27 +374,9 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
 
                         moves += 1
 
-                #     elif evil:
-                #         arcpy.AddMessage(str(ij) + ' not replaced')
-                # elif evil:
-                #     arcpy.AddMessage(str(ij) + ' with ' + str(npdist[ij]) + ' dist and ' + str(npback[ij]) + ' backlink bypassed')
-            # if evil:
-            #     sys.exit(0)
-            if (deads > 0):
-                dead_cells.append(cell)
-                dead_dist.append(celldist)
-            # visited.append(cell)
-            # if (cell == destination):
-            #     return npdist, npback
         calculated = [ij for dist, ij in sorted(zip(newdist, newcalc))]
-        # perc = 100 * float(len(visited)) / float(total)
-        # arcpy.AddMessage('Percentage processed: ' + str(perc)) # TODO: correct estimate!
-        # arcpy.AddMessage('% / successful / incompatible: ' + str(round(perc, 1)) + ' / ' + str(moves) + ' / ' + str(incomp_moves))
 
-    arcpy.AddMessage(dead_cells)
-    arcpy.AddMessage(dead_dist)
     return npdist, npback
-
 
 def cost_path(coords, cost, radius, source, destination):
     back = {
@@ -448,24 +396,15 @@ def cost_path(coords, cost, radius, source, destination):
     cellsize = desc.meanCellWidth
     minx = lowerleft.X
     miny = lowerleft.Y
-
-    # npdist  = arcpy.RasterToNumPyArray(distance)
-    # npback = arcpy.RasterToNumPyArray(backlink)
     npcost = arcpy.RasterToNumPyArray(cost, nodata_to_value = -1)
 
 
     ni = npcost.shape[0]
     nj = npcost.shape[1]
 
-    # idest = ni - math.trunc((destination[1] - miny) / cellsize) - 1
-    # jdest = math.trunc((destination[0] - minx) / cellsize)
-
     # Generate compatibility raster
-
     arcpy.AddMessage('Generating compatibility sets')
     npcomp = [[set() for j in range(nj)] for i in range(ni)] # compatibility raster
-
-    arcpy.AddMessage('Empty sets created')
 
     k = 0
     for pnt in coords:
@@ -485,45 +424,14 @@ def cost_path(coords, cost, radius, source, destination):
     k = 0
 
     arcpy.AddMessage('Tracing')
-    # minimax = [min(npcomp[ij[0]][ij[1]])]
-    # kprob = None
-    # minprob = None
-    # prohibited = []
-    # problem = False
 
     while type != 0:
         shift = back[npback[ij]]
         ij = (ij[0] + shift[0], ij[1] + shift[1])
 
-        # ij = get_neighbor(path, npdist, npcomp, ni, nj, ij[0], ij[1], minimax[k], prohibited)
-
-        # if ijback != ij:
-        #     kprob = k - 1
-        #
-        # if ij == None:
-        #     minprob = minimax[k-1]
-        #     for l in range(kprob, k):
-        #         prohibited.append(path.pop())
-        #         minimax.pop()
-        #     problem = True
-        #     k = kprob
-        #     ij = path[-1]
-        #     continue
-
         path.append(ij)
-        # nextcomp = npcomp[ij[0]][ij[1]]
-        #
-        # nextmini = minimax[-1]
-        # while (nextmini - 1) in nextcomp:
-        #     nextmini = nextmini - 1
-        # minimax.append(nextmini)
-        #
-        # if (problem == True and minimax[-1] < minprob):
-        #     problem = False
-            # prohibited = []
-
         type = npback[ij]
-        arcpy.AddMessage('Point added: ' + str(k))
+
         k += 1
 
     path.reverse()
@@ -579,8 +487,6 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         geometries = get_coordinates(instreams)
         if len(geometries) > 1:
             geometries = geometries[idx]
-
-        arcpy.AddMessage(geometries)
 
         startxy = [startxy[i] for i in idx]
         endxy = [endxy[i] for i in idx]
@@ -641,7 +547,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                         s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
                         ncells = len(e)
 
-                        if False: #ncells > 0 and Utils.frechet_dist(s, geometries[k]) <= deviation:
+                        if ncells > 0 and Utils.frechet_dist(s, geometries[k]) <= deviation:
                             l = 0
                             cur = s[l]
                             startstream = []
@@ -743,19 +649,6 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
-
-                ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
-                arcpy.DefineProjection_management(ras, crs)
-                ras.save('X:/DEMGEN/dist.tif')
-
-                ras = arcpy.NumPyArrayToRaster(npback, lowerleft, cellsize, value_to_nodata=-1)
-                arcpy.DefineProjection_management(ras, crs)
-                ras.save('X:/DEMGEN/back.tif')
-
-                arcpy.AddMessage('PATH created!')
-                arcpy.AddMessage(path)
-
                 # nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
                 # npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
                 #
@@ -767,6 +660,19 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 # idx = numpy.argsort(values)
                 #
                 # path = list(map(tuple, cells[idx, :]))
+
+                path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+
+                # ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
+                # arcpy.DefineProjection_management(ras, crs)
+                # ras.save('X:/DEMGEN/dist.tif')
+                #
+                # ras = arcpy.NumPyArrayToRaster(npback, lowerleft, cellsize, value_to_nodata=-1)
+                # arcpy.DefineProjection_management(ras, crs)
+                # ras.save('X:/DEMGEN/back.tif')
+                #
+                # arcpy.AddMessage('PATH created!')
+                # arcpy.AddMessage(path)
 
                 if startdep:
                     nl = len(path)
@@ -804,16 +710,11 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
         N = len(streams)
 
-        arcpy.AddMessage(N)
-
         if (N > 0):
             outraster = numpy.full((N, ni, nj), nodatavalue)
             for l in range(N):
                 for ncells in range(len(streams[l])):
                     outraster[l, streams[l][ncells][0], streams[l][ncells][1]] = ordids[l]
-
-        arcpy.AddMessage(numpy.amax(outraster))
-        arcpy.AddMessage(numpy.amin(outraster))
 
         outinnerraster = arcpy.sa.Int(arcpy.NumPyArrayToRaster(outraster[0, :, :],
                                                                lowerleft, cellsize, value_to_nodata=nodatavalue))
@@ -832,29 +733,27 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             arcpy.Append_management(templines, result, schema_type='NO_TEST')
 
         arcpy.AddField_management(result, 'type', 'TEXT', field_length=16)
-
-        arcpy.AddMessage(int(arcpy.GetCount_management(result).getOutput(0)))
-        # result = set_values(result, 'type', types)
+        result = set_values(result, 'type', types)
 
         arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
 
         # ensure right direction
         arcpy.AddMessage('ENSURING RIGHT DIRECTION...')
 
-        # with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
-        #     for row in rows:
-        #         line = row[0].getPart(0)
-        #         count_start = [line[0].X, line[0].Y]
-        #         id = row[1]
-        #
-        #         idx = numpy.where(ordids == id)[0].tolist()[0]
-        #
-        #         hydro_start = startxy[idx]
-        #         hydro_end = endxy[idx]
-        #
-        #         if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
-        #             row[0] = FlipLine(line)
-        #             rows.updateRow(row)
+        with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
+            for row in rows:
+                line = row[0].getPart(0)
+                count_start = [line[0].X, line[0].Y]
+                id = row[1]
+
+                idx = numpy.where(ordids == id)[0].tolist()[0]
+
+                hydro_start = startxy[idx]
+                hydro_end = endxy[idx]
+
+                if euc_distance(count_start, hydro_start) > euc_distance(count_start, hydro_end):
+                    row[0] = FlipLine(line)
+                    rows.updateRow(row)
 
         arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
 
