@@ -86,7 +86,7 @@ def extend_array(array, nx, ny, value):
 
     return extarray
 
-def get_window(ij, ni, nj, size=3):
+def get_window(npcost, ij, ni, nj, size=3):
     w = int((size - 1) / 2)
     l = range(-w, w + 1)  # calculate kernel indices
     idx = numpy.meshgrid(l, l)  # generate coordinate matrices
@@ -99,7 +99,8 @@ def get_window(ij, ni, nj, size=3):
     x = x[flt_xy]
     y = y[flt_xy]
 
-    npdist = ((x - ij[0]) ** 2 + (y - ij[1]) ** 2) ** 0.5
+    costs = numpy.array([npcost[i, j] for i, j in zip(x, y)])
+    npdist = costs * (((x - ij[0]) ** 2 + (y - ij[1]) ** 2) ** 0.5)
 
     order = numpy.argsort(npdist)
 
@@ -271,7 +272,34 @@ def invback(a, b):
 
     return None
 
-def cost_distance(source, npcost, npcomp, cellsize, nodatavalue=-1):
+def minimax(arr):
+    brr = list(arr)
+    m = min(brr)
+    mmax = m
+    brr.sort()
+    for i in range(len(brr)):
+        if (m + i) in brr:
+            mmax = m + i
+        else:
+            break
+    return mmax
+
+def longgap(arr):
+    brr = list(arr)
+    m = min(brr)
+    gap = 0
+    brr.sort()
+    for i in range(len(brr)):
+        if (m + i) not in brr:
+            gap += 1
+        else:
+            gap = 0
+
+        if gap > 1:
+            return True
+    return False
+
+def cost_distance(source, npcost, npcomp, nodatavalue=-1):
     visited = []
     calculated = [source]
 
@@ -284,32 +312,74 @@ def cost_distance(source, npcost, npcomp, cellsize, nodatavalue=-1):
 
     npdist = numpy.full((ni, nj), float('Inf'))
     npback = numpy.full((ni, nj), nodatavalue)
+    npminimax = numpy.full((ni, nj), nodatavalue).astype(int)
+    npgap = numpy.zeros((ni, nj))
 
     npdist[source] = 0
     npback[source] = 0
+    npminimax[source] = minimax(npcomp[source[0]][source[1]])
 
     while len(calculated) > 0:
         newcalc = []
         newdist = []
+        incomp_moves = 0
+        moves = 0
         for cell in calculated:
             celldist = npdist[cell]
-            nb, dist = get_window(cell, ni, nj)
+            nb, dist = get_window(npcost, cell, ni, nj)
+            cell_minimax = npminimax[cell]
+            cell_compat = npcomp[cell[0]][cell[1]]
+
             for (ij, d) in zip(nb, dist):
                 if (ij not in visited) and (npcost[ij] != nodatavalue):
-                    accum_dist = celldist + d * npcost[ij]
+
+                    ijcomp = npcomp[ij[0]][ij[1]]
+
+                    if len(ijcomp) < 1:
+                        incomp_moves += 1
+                        continue
+
+                    if len(ijcomp.intersection(cell_compat)) == 0:
+                        incomp_moves += 1
+                        continue
+
+                    # if (cell_minimax not in ijcomp) and (longgap(cell_compat) or longgap(ijcomp)):
+                    if (cell_minimax not in ijcomp) and ((max(cell_compat) != minimax(cell_compat)) or (minimax(ijcomp) != max(ijcomp))):
+                    # if (cell_minimax not in ijcomp) or (not ijcomp.issubset(cell_compat)):
+                    # if (cell_minimax not in ijcomp) and (max(cell_compat) != minimax(cell_compat)):
+                    # if (cell_minimax not in ijcomp) and (minimax(ijcomp) != max(ijcomp)):
+                        # if (celldist > 142818) and (d < 2):
+                        #     arcpy.AddMessage(cell_minimax)
+                        #     arcpy.AddMessage(cell_compat)
+                        #     arcpy.AddMessage(ijcomp)
+                        incomp_moves += 1
+                        continue
+
+                    accum_dist = celldist + d
                     if accum_dist < npdist[ij]:
                         npdist[ij] = accum_dist
                         npback[ij] = invback(cell, ij)
+
+                        # if minimax(ijcomp) != max(ijcomp):
+                        if cell_minimax in ijcomp:
+                            npminimax[ij] = minimax(set(range(cell_minimax, max(ijcomp) + 1)).intersection(ijcomp))
+                        else:
+                            npminimax[ij] = max(ijcomp)
+                            # npminimax[ij] = minimax(set(range(min(ijcomp), max(ijcomp) + 1)).intersection(ijcomp))
+
                         if (ij not in newcalc):
                             newcalc.append(ij)
                             newdist.append(accum_dist)
                         else:
                             newdist[newcalc.index(ij)] = accum_dist
 
+                        moves += 1
+
             visited.append(cell)
         calculated = [ij for dist, ij in sorted(zip(newdist, newcalc))]
         perc = 100 * float(len(visited)) / float(total)
         arcpy.AddMessage('Percentage processed: ' + str(perc)) # TODO: correct estimate!
+        arcpy.AddMessage('Successful / incompatible moves: ' + str(moves) + ' / ' + str(incomp_moves))
 
     return npdist, npback
 
@@ -349,6 +419,8 @@ def cost_path(coords, cost, radius, source, destination):
     arcpy.AddMessage('Generating compatibility sets')
     npcomp = [[set() for j in range(nj)] for i in range(ni)] # compatibility raster
 
+    npnear = numpy.zeros((ni,nj)).astype(int)
+
     arcpy.AddMessage('Empty sets created')
 
     k = 0
@@ -357,11 +429,11 @@ def cost_path(coords, cost, radius, source, destination):
         jp = math.trunc((pnt[0] - minx) / cellsize)
         nb = get_neighborhood(ip, jp, radius, cellsize, ni, nj)
         for (i, j) in nb:
-            npcomp[i][j] = npcomp[i][j].union([k])
+            npcomp[i][j] = npcomp[i][j].union([int(k)])
         k +=1
 
     arcpy.AddMessage('Calculating distance and backlink rasters')
-    npdist, npback = cost_distance(source, npcost, npcomp, cellsize)
+    npdist, npback = cost_distance(source, npcost, npcomp)
 
     ij = destination
     path = [ij]
@@ -412,7 +484,7 @@ def cost_path(coords, cost, radius, source, destination):
 
     path.reverse()
 
-    return path
+    return path, npdist
 
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
                    ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams):
@@ -612,6 +684,10 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 # arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
                 arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
 
+                # cost.save('X:/DEMGEN/cost.tif')
+
+                # return
+
                 # arcpy.env.workspace = "X:/DEMGEN/"
                 # if arcpy.Exists("cost.tif"):
                 #     arcpy.Delete_management("cost.tif")
@@ -623,7 +699,11 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                path = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+                path, npdist = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+
+                ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
+                arcpy.DefineProjection_management(ras, crs)
+                ras.save('X:/DEMGEN/dist.tif')
 
                 arcpy.AddMessage('PATH created!')
                 arcpy.AddMessage(path)
