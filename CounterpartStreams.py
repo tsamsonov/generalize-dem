@@ -284,6 +284,16 @@ def minimax(arr):
             break
     return mmax
 
+def maximin(arr):
+    m = max(arr)
+    mmin = m
+    for i in range(len(arr)):
+        if (m - i) in arr:
+            mmin = m - i
+        else:
+            break
+    return mmin
+
 def longgap(arr):
     brr = list(arr)
     m = min(brr)
@@ -300,6 +310,19 @@ def longgap(arr):
     return False
 
 def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
+
+    back = {
+        0: (0,  0),
+        1: (1,  0),
+        2: (1,  1),
+        3: (0,  1),
+        4: (1, -1),
+        5: (0, -1),
+        6: (-1,-1),
+        7: (-1, 0),
+        8: (-1, 1)
+    }
+
     # visited = []
     calculated = [source]
 
@@ -313,10 +336,12 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
     npdist = numpy.full((ni, nj), float('Inf'))
     npback = numpy.full((ni, nj), nodatavalue)
     npminimax = numpy.full((ni, nj), nodatavalue).astype(int)
+    # npmaximin = numpy.full((ni, nj), nodatavalue).astype(int)
 
     npdist[source] = 0
     npback[source] = 0
     npminimax[source] = minimax(npcomp[source[0]][source[1]])
+    # npmaximin[source] = maximin(npcomp[source[0]][source[1]])
 
     dead_cells = []
     dead_dist = []
@@ -351,28 +376,40 @@ def cost_distance(source, npcost, npcomp, destination, nodatavalue=-1):
                         incomp_moves += 1
                         continue
 
-                    if (cell_minimax not in ijcomp) and ((max(cell_compat) != minimax(cell_compat)) or (minimax(ijcomp) != max(ijcomp))):
+                    # if (cell_minimax not in ijcomp) and ((max(cell_compat) != minimax(cell_compat)) or (minimax(ijcomp) != max(ijcomp))):
+                    # ijminimax = max(ijcomp)
+                    # if cell_minimax in ijcomp:
+                    #     ijminimax = minimax(set(range(cell_minimax, max(ijcomp) + 1)).intersection(ijcomp))
+
+                    if min(ijcomp) > cell_minimax:
                         if d < 2:
                             deads += 1
                         incomp_moves += 1
                         continue
 
                     accum_dist = celldist + d
-                    if accum_dist < npdist[ij]:
+                    if (accum_dist < npdist[ij]): #or ((npdist[ij] < float('inf')) and (npminimax[ij] < maximin(cell_compat))):
                         npdist[ij] = accum_dist
                         npback[ij] = invback(cell, ij)
 
                         if cell_minimax in ijcomp:
                             npminimax[ij] = minimax(set(range(cell_minimax, max(ijcomp) + 1)).intersection(ijcomp))
                         else:
-                            npminimax[ij] = max(ijcomp)
+                            npminimax[ij] = minimax(ijcomp)
                         if (ij not in newcalc):
                             newcalc.append(ij)
                             newdist.append(accum_dist)
                         else:
                             newdist[newcalc.index(ij)] = accum_dist
-
                         moves += 1
+                    # elif npdist[ij] < float('inf'):
+                    #     type = npback[cell]
+                    #     while type != 0:
+                    #         shift = back[npback[ij]]
+                    #         ij = (ij[0] + shift[0], ij[1] + shift[1])
+                    #         type = npback[ij]
+                    #         if ()
+
 
         calculated = [ij for dist, ij in sorted(zip(newdist, newcalc))]
 
@@ -438,8 +475,32 @@ def cost_path(coords, cost, radius, source, destination):
 
     return path, npdist, npback
 
+def extended_euc(coords, crs, cellsize, start = None, end = None):
+
+    templine = 'in_memory/templine'
+    arcpy.CreateFeatureclass_management('in_memory', 'templine', "POLYLINE", spatial_reference=crs)
+
+    cursor = arcpy.da.InsertCursor(templine, ["SHAPE@"])
+
+    points = []
+    if start != None:
+        points.append(arcpy.Point(start[0], start[1]))
+    for xy in coords:
+        points.append(arcpy.Point(xy[0], xy[1]))
+    if end != None:
+        points.append(arcpy.Point(end[0], end[1]))
+
+    array = arcpy.Array(points)
+    line = arcpy.Polyline(array)
+    cursor.insertRow([line])
+
+    del cursor
+
+    return arcpy.RasterToNumPyArray(arcpy.sa.EucDistance(templine, cell_size=cellsize))
+
+
 def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, demraster, penalty, startpts, endpts,
-                   ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams):
+                   ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams, limit):
 
     try:
         global MAXACC
@@ -485,8 +546,9 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             endxy.append([x, y])
 
         geometries = get_coordinates(instreams)
+        arcpy.AddMessage(idx)
         if len(geometries) > 1:
-            geometries = geometries[idx]
+            geometries = [geometries[i] for i in idx]
 
         startxy = [startxy[i] for i in idx]
         endxy = [endxy[i] for i in idx]
@@ -535,6 +597,12 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                         startneigh = get_neighborhood(cell[0], cell[1], radius, cellsize, ni, nj)
                         break
 
+            if enddep or startdep:
+                xystart = (minx + startneigh[0][1] * cellsize, miny + (ni - startneigh[0][0]) * cellsize) if startdep else None
+                xyend = (minx + endneigh[0][1] * cellsize, miny + (ni - endneigh[0][0]) * cellsize) if enddep else None
+
+                eucs[k, :, :] = extended_euc(geometries[k], crs, cellsize, xystart, xyend)
+
             arcpy.AddMessage("ID = " + str(ordids[k]) + ' (' + str(k + 1) + " from " + str(n) + ')')
 
             stream = []
@@ -546,29 +614,19 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                     if  inraster[i, j] > minacc:
                         s, e = trace_flow_cells(extinraster, eucs[k,:,:], i, j, minacc, endneigh)
                         ncells = len(e)
-
-                        if ncells > 0 and Utils.frechet_dist(s, geometries[k]) <= deviation:
-                            l = 0
-                            cur = s[l]
-                            startstream = []
-                            while cur in startneigh:
-                                startstream.append(cur)
-                                l += 1
-                                if (l < ncells):
-                                    cur = s[l]
-                                else:
-                                    break
-
-                            nstart = l-1
-
-                            L = path_length(startstream) + 1
-
-                            E = sum(e[0:nstart]) / (cellsize * L)
-                            D = euc_distance((i, j), startneigh[0]) / L
-                            w = math.sqrt(E + 1) * (D + 1)
-                            if w < weight:
-                                stream = s
-                                weight = w
+                        if ncells > 0:
+                            coords = []
+                            for (i, j) in s:
+                                coords.append((minx + j * cellsize, miny + (ni - i) * cellsize))
+                            dev = Utils.dist_fun[limit](coords, geometries[k])
+                            # arcpy.AddMessage(coords)
+                            # arcpy.AddMessage(geometries[k])
+                            # arcpy.AddMessage(dev)
+                            if (dev <= deviation):
+                                w = Utils.hausdorff_dist_mod(coords, geometries[k])
+                                if (w < weight):
+                                    stream = s
+                                    weight = w
                 extend = True
 
                 if len(stream) > 0:
@@ -616,25 +674,24 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 euc = arcpy.NumPyArrayToRaster(eucs[k, :, :], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
 
-                # euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
-                #                                            arcpy.sa.RemapRange([[0, deviation, penalty],
-                #                                                                 [deviation, euc.maximum,
-                #                                                                  'NODATA']]))
-
-                euc_mask = arcpy.sa.Reclassify(euc, "value",
+                euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
                                                            arcpy.sa.RemapRange([[0, deviation, penalty],
                                                                                 [deviation, euc.maximum,
                                                                                  'NODATA']]))
+                # euc_mask = arcpy.sa.Reclassify(euc, "value",
+                #                                            arcpy.sa.RemapRange([[0, deviation, penalty],
+                #                                                                 [deviation, euc.maximum,
+                #                                                                  'NODATA']]))
 
                 strs = arcpy.sa.Reclassify(in_raster, "value",
                                            arcpy.sa.RemapRange([[0, minacc, 'NODATA'], [minacc, MAXACC, 1]]))
 
                 cost = arcpy.sa.ExtractByMask(strs, euc_mask) #* euc
 
-                # arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
-                arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
+                arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
+                # arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
 
-                # cost.save('X:/DEMGEN/cost.tif')
+                cost.save('X:/DEMGEN/cost_new.tif')
 
                 # return
 
@@ -644,25 +701,25 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 #
                 # cost.save('cost.tif')
 
-                # backlink = arcpy.sa.CostBackLink(startlyr, cost)
-                # costdist = arcpy.sa.CostDistance(startlyr, cost)
+                backlink = arcpy.sa.CostBackLink(startlyr, cost)
+                costdist = arcpy.sa.CostDistance(startlyr, cost)
 
-                # costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
+                costpath = arcpy.sa.CostPath(endlyr, cost, backlink)
 
-                # nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
-                # npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
-                #
-                # cellidx = numpy.where(nppath >= 0)
-                # cells = numpy.argwhere(nppath >= 0)
-                #
-                # values = npdist[cellidx]
-                #
-                # idx = numpy.argsort(values)
-                #
-                # path = list(map(tuple, cells[idx, :]))
+                nppath = arcpy.RasterToNumPyArray(costpath, nodata_to_value=-1)
+                npdist = arcpy.RasterToNumPyArray(costdist, nodata_to_value=-1)
 
-                path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+                cellidx = numpy.where(nppath >= 0)
+                cells = numpy.argwhere(nppath >= 0)
 
+                values = npdist[cellidx]
+
+                idx = numpy.argsort(values)
+
+                path = list(map(tuple, cells[idx, :]))
+
+                # path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
+                #
                 # ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
                 # arcpy.DefineProjection_management(ras, crs)
                 # ras.save('X:/DEMGEN/dist.tif')
@@ -736,11 +793,17 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         result = set_values(result, 'type', types)
 
         arcpy.UnsplitLine_management(result, outstreams, ['grid_code', 'type'])
+        arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
+
+        arcpy.AddField_management(outstreams, 'frechet_dist', 'FLOAT', field_length=16)
+        arcpy.AddField_management(outstreams, 'hausdorff_dist', 'FLOAT', field_length=16)
+        arcpy.AddField_management(outstreams, 'dir_hausdorff_dist', 'FLOAT', field_length=16)
+        arcpy.AddField_management(outstreams, 'quality', 'TEXT', field_length=16)
 
         # ensure right direction
-        arcpy.AddMessage('ENSURING RIGHT DIRECTION...')
+        arcpy.AddMessage('ENSURING RIGHT DIRECTION AND ASSESSING THE QUALITY...')
 
-        with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code']) as rows:
+        with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code', 'frechet_dist', 'hausdorff_dist', 'dir_hausdorff_dist', 'quality']) as rows:
             for row in rows:
                 line = row[0].getPart(0)
                 count_start = [line[0].X, line[0].Y]
@@ -755,8 +818,22 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                     row[0] = FlipLine(line)
                     rows.updateRow(row)
 
-        arcpy.Densify_edit(outstreams, 'DISTANCE', cellsize)
+                coords = []
+                for pnt in row[0].getPart().next():
+                    coords.append([pnt.X, pnt.Y])
 
+                row[2] = Utils.frechet_dist(coords, geometries[idx])
+                row[3] = Utils.hausdorff_dist(coords, geometries[idx])
+                row[4] = Utils.hausdorff_dist_dir(coords, geometries[idx])
+                rows.updateRow(row)
+
+                if row[2] <= deviation:
+                    row[5] = 'Strong'
+                elif row[3] <= deviation:
+                    row[5] = 'Regular'
+                else:
+                    row[5] = 'Weak'
+                rows.updateRow(row)
         return
 
     except:
@@ -767,7 +844,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         arcpy.AddError(pymsg)
         raise Exception
 
-def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation):
+def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation, limit):
     global MAXACC
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
@@ -851,7 +928,7 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             depstarts = depstarts[not_ord]
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
-                   startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams)
+                   startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams, limit)
 
     return
 

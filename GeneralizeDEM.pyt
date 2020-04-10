@@ -256,7 +256,16 @@ class CounterpartStreams(object):
             parameterType="Required",
             direction="Input")
 
-        params = [in_streams, in_field, in_raster, dem_raster, out_streams, min_acc, penalty, radius, deviation]
+        limit = arcpy.Parameter(
+            displayName="Deviation distance metric (flowline counterparts only)",
+            name="limit",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+        limit.value = 'DIRECTED HAUSDORFF'
+        limit.filter.list = ['DIRECTED HAUSDORFF', 'HAUSDORFF', 'FRECHET']
+
+        params = [in_streams, in_field, in_raster, dem_raster, out_streams, min_acc, penalty, radius, deviation, limit]
         return params
 
     def isLicensed(self):
@@ -279,8 +288,9 @@ class CounterpartStreams(object):
         penalty = int(parameters[6].valueAsText)
         radius = float(parameters[7].valueAsText)
         deviation = float(parameters[8].valueAsText)
+        limit = parameters[9].valueAsText
 
-        CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, penalty, radius, deviation)
+        CS.execute(instreams, inidfield, inraster, demraster, outstreams, minacc, penalty, radius, deviation, limit)
 
         return
 
@@ -804,7 +814,7 @@ class GeneralizeDEM(object):
             parameterType="Optional",
             direction="Input")
         is_tiled.category = '4. Tiling and parallel processing'
-        is_tiled.value = 'true'
+        is_tiled.value = 'false'
 
         tile_size = arcpy.Parameter(
             displayName="Tile size",

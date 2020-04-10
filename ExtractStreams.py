@@ -164,11 +164,22 @@ def execute(inraster, outraster, minacc, minlen):
     cellsize = desc.meanCellWidth
     crs = desc.spatialReference
 
+    arcpy.AddMessage(cellsize)
+
     # Convert python list to ASCII
     arcpy.AddMessage("Writing streams...")
-    outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize)
+    outinnerraster = arcpy.NumPyArrayToRaster(newrasternumpy, lowerleft, cellsize, cellsize)
     arcpy.DefineProjection_management(outinnerraster, crs)
-    outinnerraster.save(outraster)
+
+    weird_width = outinnerraster.meanCellWidth
+    arcpy.AddMessage(weird_width)
+
+    rescaled = 'in_memory/rescaled'
+    arcpy.Rescale_management(outinnerraster, rescaled, cellsize/weird_width, cellsize/weird_width)
+    arcpy.Shift_management(rescaled, outraster, 0, -2*cellsize, inraster)
+    arcpy.AddMessage(arcpy.sa.Raster(outraster).meanCellWidth)
+
+    # outinnerraster.save(outraster)
 
 if __name__ == "__main__":
     try:

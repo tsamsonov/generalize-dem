@@ -7,6 +7,22 @@ from scipy.spatial.distance import cdist
 def euc_dist(p1, p2):
     return math.sqrt((p2[0] - p1[0]) * (p2[0] - p1[0]) + (p2[1] - p1[1]) * (p2[1] - p1[1]))
 
+def euc_matrix(P, Q):
+    mdist = cdist(P, Q, 'euclidean')
+    return mdist
+
+def hausdorff_dist(P, Q):
+    m = euc_matrix(P, Q)
+    return max(max(numpy.amin(m, 0)), max(numpy.amin(m, 1)))
+
+def hausdorff_dist_dir(P, Q):
+    m = euc_matrix(P, Q)
+    return max(numpy.amin(m, 0))
+
+def hausdorff_dist_mod(P, Q):
+    m = euc_matrix(P, Q)
+    return max(numpy.mean(numpy.amin(m, 0)), numpy.mean(max(numpy.amin(m, 1))))
+
 def frechet_dist(P,Q):
     n = len(P)
     m = len(Q)
@@ -26,6 +42,8 @@ def frechet_dist(P,Q):
                            euc_dist(P[i], Q[j]))
     return ca[n-1, m-1]
 
-def euc_matrix(P, Q):
-    mdist = cdist(P, Q, 'euclidean')
-    return mdist
+dist_fun = {
+    'DIRECTED HAUSDORFF': hausdorff_dist_dir,
+    'HAUSDORFF': hausdorff_dist,
+    'FRECHET': frechet_dist
+}

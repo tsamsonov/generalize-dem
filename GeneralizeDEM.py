@@ -36,7 +36,7 @@ def call(oid,
          scratchworkspace):
     try:
         i = int(oid) - 1
-        raster = 'dem' + str(i)
+        raster = 'dem' + str(i) + '.tif'
         N = int(arcpy.GetCount_management(fishbuffer).getOutput(0))
 
         arcpy.AddMessage('\n> GENERALIZING DEM ' + str(i + 1) + ' FROM ' + str(N) + '\n')
@@ -111,8 +111,8 @@ def call(oid,
                         return True
                     else:
                         dem = ExtractByMask(dem0, cell_erased)
-                        dem.save(rastertinworkspace + '/' + raster + "_e")
-                        dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e")
+                        dem.save(rastertinworkspace + '/' + raster + "_e.tif")
+                        dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e.tif")
 
                         arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only=True)
 
@@ -132,7 +132,7 @@ def call(oid,
         # MAIN STREAMS AND WATERSHEDS
         arcpy.AddMessage("PROCESSING PRIMARY STREAMS AND WATERSHEDS")
 
-        str1_0 = workspace + "/str10"
+        str1_0 = rastertinworkspace + "/str10.tif"
 
         arcpy.AddMessage("Extracting primary streams...")
 
@@ -152,7 +152,7 @@ def call(oid,
             str1 = SetNull(str1_0, 1, "value = 0")
 
             arcpy.AddMessage("Vectorizing streams...")
-            StreamToFeature(str1, dir, streams1, True)
+            StreamToFeature(str1, dir, streams1, False)
 
             arcpy.AddMessage("Deriving endpoints...")
             endpoints1 = workspace + "/endpoints1"
@@ -167,7 +167,7 @@ def call(oid,
 
             arcpy.AddMessage("Buffering endpoints...")
             rpts11 = Con(rpts1, 1, 0, "Value>0")
-            rendbuffers1 = Expand(rpts11, radius, [1])
+            rendbuffers1 = Expand(rpts11, 2*radius, [1])
 
             # endbuffers1 = workspace + "/endbuffers1"
             # arcpy.Buffer_analysis(endpoints1, endbuffers1, radius, "FULL", "ROUND", "NONE", "")
@@ -182,7 +182,7 @@ def call(oid,
 
             arcpy.AddMessage("Vectorizing erased streams...")
             streams1_e = workspace + "/streams1_e"
-            StreamToFeature(str1_e, dir, streams1_e, True)
+            StreamToFeature(str1_e, dir, streams1_e, False)
 
             arcpy.AddMessage("Deriving erased endpoints...")
             endpoints1_e = workspace + "/endpoints1_e"
@@ -197,7 +197,7 @@ def call(oid,
             watersheds1 = workspace + "/watersheds1"
 
             try:
-                arcpy.RasterToPolygon_conversion(wsh1, watersheds1, True, "")
+                arcpy.RasterToPolygon_conversion(wsh1, watersheds1, False, "")
             except:
                 arcpy.AddMessage("\n> FAILED TO CONVERT PRIMARY WATERSHEDS TO VECTOR - PROBABLY EXTENT ERROR. MASKING...\n")
 
@@ -245,7 +245,7 @@ def call(oid,
             arcpy.AddMessage("PROCESSING SECONDARY STREAMS AND WATERSHEDS")
 
             arcpy.AddMessage("Extracting secondary streams...")
-            str2_0 = workspace + "/str2"
+            str2_0 = rastertinworkspace + "/str2.tif"
             ExtractStreams.execute(acc, str2_0, minacc2, minlen2)
 
             str2 = SetNull(str2_0, 1, "value = 0")
@@ -254,7 +254,7 @@ def call(oid,
 
             arcpy.AddMessage("Vectorizing streams...")
             streams2_e = workspace + "/streams2_e"
-            StreamToFeature(str2_e, dir, streams2_e, True)
+            StreamToFeature(str2_e, dir, streams2_e, False)
 
             arcpy.AddMessage("Deriving endpoints...")
             endpoints2_e = workspace + "/endpoints2_e"
@@ -294,7 +294,7 @@ def call(oid,
             watersheds2 = workspace + "/watersheds2"
 
             try:
-                arcpy.RasterToPolygon_conversion(wsh2, watersheds2, True, "")
+                arcpy.RasterToPolygon_conversion(wsh2, watersheds2, False, "")
             except:
                 arcpy.AddMessage("\n> FAILED TO CONVERT SECONDARY WATERSHEDS TO VECTOR - PROBABLY EXTENT ERROR. MASKING...\n")
                 domain = workspace + "/domain2"
@@ -333,14 +333,14 @@ def call(oid,
 
                 wsh2_m = SetNull(envmask, wsh2, "VALUE = 2")
 
-                arcpy.RasterToPolygon_conversion(wsh2_m, watersheds2, True, "")
+                arcpy.RasterToPolygon_conversion(wsh2_m, watersheds2, False, "")
 
             # PROCESSING NARROW AREAS WITHOUT WATERSHEDS
 
             arcpy.AddMessage("Processing remaining basins...")
             bsn = Basin(dir)
             basins = workspace + "/basins"
-            arcpy.RasterToPolygon_conversion(bsn, basins, True, "")
+            arcpy.RasterToPolygon_conversion(bsn, basins, False, "")
             basins_e = workspace + "/basins_e"
             arcpy.Erase_analysis(basins, watersheds1, basins_e)
 
@@ -413,7 +413,7 @@ def call(oid,
             arcpy.AddMessage("NO STREAMS DETECTED. PROCESSING BASINS...")
             bsn = Basin(dir)
             basins = workspace + "/basins"
-            arcpy.RasterToPolygon_conversion(bsn, basins, True, "")
+            arcpy.RasterToPolygon_conversion(bsn, basins, False, "")
             basins_3d = workspace + "/basins_3d"
             arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, basins, basins_3d)
             b = "'" + basins_3d + "' Shape.Z " + "softline"
@@ -440,7 +440,7 @@ def call(oid,
         # GENERALIZED RASTER SURFACE
         arcpy.AddMessage("TIN to raster conversion...")
 
-        rastertin = rastertinworkspace + "/rastertin"
+        rastertin = rastertinworkspace + "/rastertin.tif"
         try:
             arcpy.TinRaster_3d(tin, rastertin, "FLOAT", "NATURAL_NEIGHBORS", "CELLSIZE " + str(cellsize), 1)
         except:
@@ -454,7 +454,7 @@ def call(oid,
         widenraster = rastertin
         if is_widen and stream_processing:
             arcpy.AddMessage("Raster widening...")
-            widenraster = workspace + "/widenraster"
+            widenraster = rastertinworkspace + "/widenraster.tif"
             WidenLandforms.execute(rastertin, streams1, widendist, filtersize, widenraster, widentype)
 
         # Smooth DEM
@@ -471,10 +471,10 @@ def call(oid,
                 arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
                 arcpy.AddMessage("Saving result...")
                 res = arcpy.Raster(rastertin)
-                res.save(scratchworkspace + '/gen/dem' + str(i))
+                res.save(scratchworkspace + '/gen/dem' + str(i) + '.tif')
             except:
                 arcpy.AddMessage("Retrying to mask in raster mode...")
-                erased_r = workspace + "/erased_r"
+                erased_r = rastertinworkspace + "/erased_r.tif"
 
                 arcpy.PolygonToRaster_conversion(cell_erased, "OBJECTID",
                                                  erased_r, cellsize=cellsize)
@@ -485,10 +485,10 @@ def call(oid,
                 arcpy.Mosaic_management(result_erased, rastertin, "FIRST", "FIRST", "", "", "", "0.3", "NONE")
                 arcpy.AddMessage("Saving result...")
                 res = arcpy.Raster(rastertin)
-                res.save(scratchworkspace + '/gen/dem' + str(i))
+                res.save(scratchworkspace + '/gen/dem' + str(i) + '.tif')
         else:
             arcpy.AddMessage("Saving result...")
-            result.save(scratchworkspace + '/gen/dem' + str(i))
+            result.save(scratchworkspace + '/gen/dem' + str(i) + '.tif')
 
         # arcpy.AddMessage("CLEANING MAIN DATA")
 
@@ -593,6 +593,7 @@ def execute(demdataset,
         ncols = int(math.ceil(float(demsource.width) / float(tile_size)))
         total = nrows * ncols
 
+        arcpy.AddMessage(is_tiled)
         is_tiled = is_tiled and total > 1
 
         cellsize = 0.5 * (demsource.meanCellHeight + demsource.meanCellWidth)
@@ -650,7 +651,7 @@ def execute(demdataset,
                                              scratchworkspace + "/source",
                                              'dem',
                                              split_method='NUMBER_OF_TILES',
-                                             format='GRID',
+                                             format='TIFF',
                                              num_rasters = str(ncols) + ' ' + str(nrows),
                                              overlap=2*bufferpixelwidth)
 
@@ -659,8 +660,15 @@ def execute(demdataset,
                 oids = [int(row[0]) for row in rows]
 
             else:
+                arcpy.env.extent = demsource.extent  # Very important!
+                arcpy.env.snapRaster = demsource  # Very important!
                 CreateFishnet.execute(demdataset, fishbuffer, 1, 1) # Just DEM envelope
-                arcpy.CopyRaster_management(demdataset, scratchworkspace + "/source/dem0")
+                # arcpy.AddMessage(float(cellsize))
+                # mask = CreateConstantRaster(0, "INTEGER", cellsize, demsource.extent)
+                # arcpy.Mosaic_management(demdataset, mask, "FIRST", "FIRST")
+                # mask.save(scratchworkspace + "/source/dem0")
+
+                arcpy.CopyRaster_management(demdataset, scratchworkspace + "/source/dem0.tif")
                 oids = [1]
 
         # PERFORM PROCESSING
@@ -748,18 +756,18 @@ def execute(demdataset,
             rows = arcpy.da.SearchCursor(fishmaskbuffer, ['SHAPE@', 'OID@'])
             i = 0
             for row in rows:
-                raster = scratchworkspace + '/gen/dem' + str(i)
+                raster = scratchworkspace + '/gen/dem' + str(i) + '.tif'
                 if arcpy.Exists(raster):
                     dem = arcpy.Raster(raster)
                     try:
                         dem_clipped = ExtractByMask(dem, row[0])
-                        dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i))
+                        dem_clipped.save(scratchworkspace + '/gencrop/dem' + str(i) + '.tif')
                     except:
                         arcpy.AddMessage('NOTHING TO EXTRACT: Tile ' + str(i) + ' has significant values only outside its frame')
                 i += 1
 
             arcpy.env.workspace = scratchworkspace + '/gencrop'
-            rasters = arcpy.ListRasters("*", "GRID")
+            rasters = arcpy.ListRasters("*", "TIFF")
 
             if len(rasters) > 0:
                 rasters_str = ';'.join(rasters)
@@ -776,9 +784,9 @@ def execute(demdataset,
             else:
                 arcpy.AddMessage('NOTHING GENERALIZED')
         else:
-            if arcpy.Exists(scratchworkspace + '/gen/dem0'):
+            if arcpy.Exists(scratchworkspace + '/gen/dem0.tif'):
                 arcpy.AddMessage('SAVING RESULT')
-                arcpy.CopyRaster_management(scratchworkspace + '/gen/dem0', output)
+                arcpy.CopyRaster_management(scratchworkspace + '/gen/dem0.tif', output)
             else:
                 arcpy.AddMessage('NOTHING GENERALIZED')
 
