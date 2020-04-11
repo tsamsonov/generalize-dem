@@ -22,6 +22,8 @@ def call_list(args):
 
 def call(oid,
          demdataset,
+         flowdir,
+         flowacc,
          marine,
          fishbuffer,
          minacc1,
@@ -122,12 +124,15 @@ def call(oid,
 
         arcpy.AddMessage("PREPROCESSING")
 
-        arcpy.AddMessage("Fill...")
-        fill = Fill(dem, "")
-        arcpy.AddMessage("Dir...")
-        dir = FlowDirection(fill, "", "")
-        arcpy.AddMessage("Acc...")
-        acc = FlowAccumulation(dir, "", "INTEGER")
+        dir = flowdir
+        acc = flowacc
+        if (dir == None):
+            arcpy.AddMessage("Fill...")
+            fill = Fill(dem, "")
+            arcpy.AddMessage("Dir...")
+            dir = FlowDirection(fill, "", "")
+            arcpy.AddMessage("Acc...")
+            acc = FlowAccumulation(dir, "", "INTEGER")
 
         # MAIN STREAMS AND WATERSHEDS
         arcpy.AddMessage("PROCESSING PRIMARY STREAMS AND WATERSHEDS")
@@ -525,6 +530,8 @@ def call(oid,
         return False
 
 def execute(demdataset,
+            flowdir,
+            flowacc,
             marine,
             output,
             outputcellsize,
@@ -694,6 +701,8 @@ def execute(demdataset,
             pool = multiprocessing.Pool(nproc)
 
             args = zip(oids, repeat(demdataset),
+                             repeat(flowdir),
+                             repeat(flowacc),
                              repeat(marine),
                              repeat(fishbuffer),
                              repeat(minacc1),
@@ -726,6 +735,8 @@ def execute(demdataset,
             for oid in oids:
                 jobs.append(call(oid,
                              demdataset,
+                             flowdir,
+                             flowacc,
                              marine,
                              fishbuffer,
                              minacc1,
@@ -802,26 +813,28 @@ def execute(demdataset,
 if __name__ == '__main__':
 
     demdataset = arcpy.GetParameterAsText(0)
-    marine = arcpy.GetParameterAsText(1)
-    output = arcpy.GetParameterAsText(2)
-    outputcellsize = float(arcpy.GetParameterAsText(3))
-    minacc1 = int(arcpy.GetParameterAsText(4))
-    minlen1 = int(arcpy.GetParameterAsText(5))
-    minacc2 = int(arcpy.GetParameterAsText(6))
-    minlen2 = int(arcpy.GetParameterAsText(7))
-    is_widen = True if arcpy.GetParameterAsText(8) == 'true' else False
-    widentype = arcpy.GetParameterAsText(9)
-    widendist = float(arcpy.GetParameterAsText(10))
-    filtersize = int(arcpy.GetParameterAsText(11))
-    is_smooth = True if arcpy.GetParameterAsText(12) == 'true' else False
-    is_tiled = True if arcpy.GetParameterAsText(13) == 'true' else False
-    tile_size = arcpy.GetParameterAsText(14)
-    is_parallel = True if arcpy.GetParameterAsText(15) == 'true' else False
-    num_processes = int(arcpy.GetParameterAsText(16))
-    is_continued = True if arcpy.GetParameterAsText(17) == 'true' else False
-    continued_folder = arcpy.GetParameterAsText(18)
+    flowdir = arcpy.GetParameterAsText(1)
+    flowacc = arcpy.GetParameterAsText(2)
+    marine = arcpy.GetParameterAsText(3)
+    output = arcpy.GetParameterAsText(4)
+    outputcellsize = float(arcpy.GetParameterAsText(5))
+    minacc1 = int(arcpy.GetParameterAsText(6))
+    minlen1 = int(arcpy.GetParameterAsText(7))
+    minacc2 = int(arcpy.GetParameterAsText(8))
+    minlen2 = int(arcpy.GetParameterAsText(9))
+    is_widen = True if arcpy.GetParameterAsText(10) == 'true' else False
+    widentype = arcpy.GetParameterAsText(11)
+    widendist = float(arcpy.GetParameterAsText(12))
+    filtersize = int(arcpy.GetParameterAsText(13))
+    is_smooth = True if arcpy.GetParameterAsText(14) == 'true' else False
+    is_tiled = True if arcpy.GetParameterAsText(15) == 'true' else False
+    tile_size = arcpy.GetParameterAsText(16)
+    is_parallel = True if arcpy.GetParameterAsText(17) == 'true' else False
+    num_processes = int(arcpy.GetParameterAsText(18))
+    is_continued = True if arcpy.GetParameterAsText(19) == 'true' else False
+    continued_folder = arcpy.GetParameterAsText(20)
 
-    execute(demdataset, marine, output, outputcellsize,
+    execute(demdataset, flowdir, flowacc, marine, output, outputcellsize,
             minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
             is_smooth, is_tiled, tile_size, is_parallel, num_processes,

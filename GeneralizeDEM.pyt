@@ -700,6 +700,22 @@ class GeneralizeDEM(object):
             direction="Input")
         demdataset.category = '1. Input and output'
 
+        flowdir = arcpy.Parameter(
+            displayName="Input flow direction raster",
+            name="flowdir",
+            datatype="GPRasterLayer",
+            parameterType="Optional",
+            direction="Input")
+        flowdir.category = '1. Input and output'
+
+        flowacc = arcpy.Parameter(
+            displayName="Input flow accumulation raster",
+            name="flowacc",
+            datatype="GPRasterLayer",
+            parameterType="Optional",
+            direction="Input")
+        flowacc.category = '1. Input and output'
+
         marine = arcpy.Parameter(
             displayName="Marine area polygon feature layer",
             name="marine",
@@ -860,7 +876,7 @@ class GeneralizeDEM(object):
             direction="Input")
         continued_folder.category = '5. Continue previous processing'
 
-        params = [demdataset, marine, output, outputcellsize, minacc1, minlen1, minacc2, minlen2,
+        params = [demdataset, flowdir, flowacc, marine, output, outputcellsize, minacc1, minlen1, minacc2, minlen2,
                   is_widen, widentype, widendist, filtersize, is_smooth, is_tiled, tile_size,
                   is_parallel, num_processes, is_continued, continued_folder]
         return params
@@ -881,43 +897,47 @@ class GeneralizeDEM(object):
 
     def execute(self, parameters, messages):
         demdataset = parameters[0].valueAsText
-        marine = parameters[1].valueAsText
-        output = parameters[2].valueAsText
-        outputcellsize = float(parameters[3].valueAsText)
-        minacc1 = int(parameters[4].valueAsText)
-        minlen1 = int(parameters[5].valueAsText)
-        minacc2 = int(parameters[6].valueAsText)
-        minlen2 = int(parameters[7].valueAsText)
-        is_widen = True if parameters[8].valueAsText == 'true' else False
-        widentype = parameters[9].valueAsText
-        widendist = float(parameters[10].valueAsText)
-        filtersize = int(parameters[11].valueAsText)
-        is_smooth = True if parameters[12].valueAsText == 'true' else False
-        is_tiled = True if parameters[13].valueAsText == 'true' else False
-        tile_size = int(parameters[14].valueAsText)
-        is_parallel = True if parameters[15].valueAsText == 'true' else False
-        num_processes = float(parameters[16].valueAsText)
-        is_continued = True if parameters[17].valueAsText == 'true' else False
-        continued_folder = parameters[18].valueAsText
+        flowdir = parameters[1].valueAsText
+        flowacc = parameters[2].valueAsText
+        marine = parameters[3].valueAsText
+        output = parameters[4].valueAsText
+        outputcellsize = float(parameters[5].valueAsText)
+        minacc1 = int(parameters[6].valueAsText)
+        minlen1 = int(parameters[7].valueAsText)
+        minacc2 = int(parameters[8].valueAsText)
+        minlen2 = int(parameters[9].valueAsText)
+        is_widen = True if parameters[10].valueAsText == 'true' else False
+        widentype = parameters[11].valueAsText
+        widendist = float(parameters[12].valueAsText)
+        filtersize = int(parameters[13].valueAsText)
+        is_smooth = True if parameters[14].valueAsText == 'true' else False
+        is_tiled = True if parameters[15].valueAsText == 'true' else False
+        tile_size = int(parameters[16].valueAsText)
+        is_parallel = True if parameters[17].valueAsText == 'true' else False
+        num_processes = float(parameters[18].valueAsText)
+        is_continued = True if parameters[19].valueAsText == 'true' else False
+        continued_folder = parameters[20].valueAsText
 
         GD.execute(demdataset,
-                  marine,
-                  output,
-                  outputcellsize,
-                  minacc1,
-                  minlen1,
-                  minacc2,
-                  minlen2,
-                  is_widen,
-                  widentype,
-                  widendist,
-                  filtersize,
-                  is_smooth,
-                  is_tiled,
-                  tile_size,
-                  is_parallel,
-                  num_processes,
-                  is_continued,
-                  continued_folder)
+                   flowdir,
+                   flowacc,
+                   marine,
+                   output,
+                   outputcellsize,
+                   minacc1,
+                   minlen1,
+                   minacc2,
+                   minlen2,
+                   is_widen,
+                   widentype,
+                   widendist,
+                   filtersize,
+                   is_smooth,
+                   is_tiled,
+                   tile_size,
+                   is_parallel,
+                   num_processes,
+                   is_continued,
+                   continued_folder)
 
         return
