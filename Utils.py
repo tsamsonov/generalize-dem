@@ -2,6 +2,7 @@
 # https://gist.github.com/MaxBareiss/ba2f9441d9455b56fbc9
 import math
 import numpy
+import arcpy
 from scipy.spatial.distance import cdist
 
 def euc_dist(p1, p2):
@@ -17,7 +18,7 @@ def hausdorff_dist(P, Q):
 
 def hausdorff_dist_dir(P, Q):
     m = euc_matrix(P, Q)
-    return max(numpy.amin(m, 0))
+    return max(numpy.amin(m, 1))
 
 def hausdorff_dist_mod(P, Q):
     m = euc_matrix(P, Q)
@@ -47,3 +48,16 @@ dist_fun = {
     'HAUSDORFF': hausdorff_dist,
     'FRECHET': frechet_dist
 }
+
+def get_values(features, field):
+    return numpy.asarray([row[0] for row in arcpy.da.SearchCursor(features, field)])
+
+def get_coordinates(features):
+    lines = []
+    with arcpy.da.SearchCursor(features, "SHAPE@") as rows:
+        for row in rows:
+            coords = []
+            for pnt in row[0].getPart().next():
+                coords.append([pnt.X, pnt.Y])
+            lines.append(coords)
+    return lines

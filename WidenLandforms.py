@@ -13,6 +13,7 @@ __author__ = 'Timofey Samsonov'
 
 def execute(demdataset, streams, distance, windowsize, output, ftype, ridges):
 
+    # TODO: respect extent of @demdataset
     arcpy.CheckOutExtension("Spatial")
 
     workspace = os.path.dirname(output)
@@ -29,6 +30,7 @@ def execute(demdataset, streams, distance, windowsize, output, ftype, ridges):
     arcpy.AddMessage("Calculating valley weights...")
     divdist = Divide(distances, distance)
     divdistminus = Minus(1, divdist)
+
     w_valleys = Con(divdistminus, 0, divdistminus, "value < 0")
 
     # Derive ridges weights

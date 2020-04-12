@@ -11,6 +11,7 @@ import CarveDEM as CD
 import ConflationLinks as CL
 import CreateFishnet as CF
 import ConflateDEMbyLinks as CB
+import LineDistances as LD
 import GeneralizeDEM as GD
 import ExtractStreams as ES
 import CounterpartStreams as CS
@@ -24,7 +25,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, CarveDEM, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
+        self.tools = [CreateFishnet, CarveDEM, CalculateLineDistances, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
 
 class CreateFishnet(object):
 
@@ -680,6 +681,90 @@ class GenerateConflationLinks(object):
         out_area = parameters[5].valueAsText
 
         CL.execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links, out_area)
+
+        return
+
+class CalculateLineDistances(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Calculate Distances Between Lines"
+        self.description = "The tool calculates Directed Hausdorff, Hausdorff and Frechet distances between corresponding lines in two layers"
+        self.canRunInBackground = True
+
+    def getParameterInfo(self):
+        """Define parameter definitions"""
+
+        in_hydrolines = arcpy.Parameter(
+            displayName="Input reference hydrographic lines",
+            name="in_hydrolines",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        hydro_field = arcpy.Parameter(
+            displayName="Hydrographic line ID field",
+            name="hydro_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        hydro_field.filter.list = ['Short', 'Long']
+        hydro_field.parameterDependencies = [in_hydrolines.name]
+
+        in_counterparts = arcpy.Parameter(
+            displayName="Input counterpart streams",
+            name="in_counterparts",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        count_field = arcpy.Parameter(
+            displayName="Couinterpart line ID field",
+            name="count_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+
+        count_field.filter.list = ['Short', 'Long']
+        count_field.parameterDependencies = [in_counterparts.name]
+
+        deviation = arcpy.Parameter(
+            displayName="Maximum deviation",
+            name="deviation",
+            datatype="GPDouble",
+            parameterType="Required",
+            direction="Input")
+
+        out_table = arcpy.Parameter(
+            displayName="Output table",
+            name="out_table",
+            datatype="DETable",
+            parameterType="Required",
+            direction="Output")
+
+        params = [in_hydrolines, hydro_field, in_counterparts, count_field, deviation, out_table]
+        return params
+
+    def isLicensed(self):
+
+        return True  # tool can be executed
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+
+        in_hydrolines = parameters[0].valueAsText
+        hydro_field = parameters[1].valueAsText
+        in_counterparts = parameters[2].valueAsText
+        count_field = parameters[3].valueAsText
+        deviation = float(parameters[4].valueAsText)
+        out_table = parameters[5].valueAsText
+
+        LD.execute(in_hydrolines, hydro_field, in_counterparts, count_field, deviation, out_table)
 
         return
 

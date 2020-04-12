@@ -691,7 +691,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 arcpy.Mosaic_management(euc_mask * arcpy.sa.Raster(demraster), cost, 'MINIMUM')
                 # arcpy.Mosaic_management(euc_mask, cost, 'MINIMUM')
 
-                cost.save('X:/DEMGEN/cost_new.tif')
+                # cost.save('X:/DEMGEN/cost_new.tif')
 
                 # return
 
