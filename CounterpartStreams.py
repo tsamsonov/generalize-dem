@@ -7,6 +7,8 @@ import numpy
 import traceback
 import math
 import Utils
+from datetime import datetime
+from datetime import timedelta
 
 MAXACC = 0
 
@@ -562,6 +564,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         streams = []
         types = []
 
+        fsum, lsum = timedelta(0), timedelta(0)
+
         for k in range(n):
 
             iend = ni - math.trunc((endxy[k][1] - miny) / cellsize) - 1
@@ -608,7 +612,10 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
             stream = []
             extend = False
 
+            t1, t2, t3, t4 = 0, 0, 0, 0
+
             if not startdep:
+                t1 = datetime.now()
                 weight = float('Inf')
                 for (i, j) in startneigh:
                     if  inraster[i, j] > minacc:
@@ -652,7 +659,15 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 else:
                     extend = False
 
+                t2 = datetime.now()
+
+                dt = t2 - t1
+                fsum += dt
+
+                arcpy.AddMessage('Flowline time: ' + str(dt))
+
             if (len(stream) == 0) or extend:
+
 
                 npstart = numpy.full((ni, nj), -1).astype(int)
 
@@ -673,6 +688,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 euc = arcpy.NumPyArrayToRaster(eucs[k, :, :], lowerleft, cellsize)
                 arcpy.DefineProjection_management(euc, crs)
+
+                t3 = datetime.now()
 
                 euc_mask = (euc + 1) * arcpy.sa.Reclassify(euc, "value",
                                                            arcpy.sa.RemapRange([[0, deviation, penalty],
@@ -718,6 +735,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
                 path = list(map(tuple, cells[idx, :]))
 
+
                 # path, npdist, npback = cost_path(geometries[k], cost, radius, startneigh[0], endneigh[0])
                 #
                 # ras = arcpy.NumPyArrayToRaster(npdist, lowerleft, cellsize, value_to_nodata=float('Inf'))
@@ -760,7 +778,17 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                     else:
                         types.append('Path')
 
+                t4 = datetime.now()
+
+                dt = t4 - t3
+                lsum += dt
+
+                arcpy.AddMessage('Least cost time: ' + str(dt))
+
             arcpy.SetProgressorPosition(k)
+
+        arcpy.AddMessage('Total flowline time: ' + str(fsum))
+        arcpy.AddMessage('Total least cost time: ' + str(lsum))
 
         outraster = None
         nodatavalue = 0 if (min(ordids) > 0) else min(ordids) - 1
@@ -913,6 +941,7 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
 
         depids = ids.copy()
 
+        i = 1
         while(len(depends) > 0):
             ord = numpy.logical_and(numpy.logical_not(numpy.in1d(depends, depids)),
                                     numpy.logical_not(numpy.in1d(depstarts, depids)))
@@ -921,11 +950,19 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             ordends = numpy.append(ordends, depends[ord])
             ordstarts = numpy.append(ordstarts, depstarts[ord])
 
+            # arcpy.AddMessage('ITER = ' + str(i))
+            # arcpy.AddMessage('ID = ' + str(depids[ord]))
+            # arcpy.AddMessage('CONFL = ' + str(depends[ord]))
+            # arcpy.AddMessage('BIFUR = ' + str(depstarts[ord]))
+
+
             not_ord = numpy.logical_not(ord)
 
             depids = depids[not_ord]
             depends = depends[not_ord]
             depstarts = depstarts[not_ord]
+
+            i += 1
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
                    startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams, limit)

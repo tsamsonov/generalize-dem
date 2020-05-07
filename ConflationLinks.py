@@ -162,8 +162,8 @@ def execute(in_hydrolines, hydro_field, in_counterparts, count_field, out_links,
         #         j += 1
         #     np += 1
 
-        fdist = frechet_dist(count_coords, hydro_coords)
-        arcpy.AddMessage('Frechet distance: ' + str(fdist) + ' (' + hydro_field + ' = ' + str(id) + ')')
+        # fdist = frechet_dist(count_coords, hydro_coords)
+        # arcpy.AddMessage('Frechet distance: ' + str(fdist) + ' (' + hydro_field + ' = ' + str(id) + ')')
 
         features = []
         for pair in pairs:

@@ -181,7 +181,7 @@ class CounterpartStreams(object):
 
     def __init__(self):
         """Define the tool (tool name is the name of the class)."""
-        self.label = "Trace Counterpart Streams"
+        self.label = "Extract Counterpart Streams"
         self.description = ""
         self.canRunInBackground = True
 
