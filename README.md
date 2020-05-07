@@ -40,11 +40,11 @@ Ten tools are contained in the toolbox:
 
 ## Example data
 
-You can find an example DEM in dem.gdb geodatabase (please unzip gdb before using). Source dem is called simply "dem" and generalized is called "dem_gen". Generalization parameters for Generalize DEM tool can be found in Parameters_Example.png screenshot.
+You can find an example DEM in `dem.gdb` geodatabase (please unzip gdb before using). Source dem is called simply `dem` and generalized is called `dem_gen`.
 
 ## Acknowledgements
 
-[pybind11](https://github.com/pybind/pybind11/) library is used to compile stream tracing module.
+[pybind11](https://github.com/pybind/pybind11/) library is used to compile stream extraction module.
 
 ## Further reading
 
