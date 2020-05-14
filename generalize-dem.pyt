@@ -8,6 +8,7 @@ import traceback
 
 import FilterDEM as FD
 import CarveDEM as CD
+import MosaicDEM as MD
 import ConflationLinks as CL
 import CreateFishnet as CF
 import ConflateDEMbyLinks as CB
@@ -357,6 +358,69 @@ class CarveDEM(object):
 
         CD.execute(in_raster, in_streams, in_field, out_raster)
 
+        return
+
+class MosaicDEM(object):
+
+    def __init__(self):
+        self.label = "Mosaic DEM"
+        self.description = ""
+        self.canRunInBackground = True
+        self.wsize = 3
+
+    def getParameterInfo(self):
+        in_rasters = arcpy.Parameter(
+            displayName="Input raster DEMs",
+            name="in_rasters",
+            datatype="GPValueTable",
+            parameterType="Required",
+            direction="Input")
+
+        in_rasters.columns = [['GPRasterLayer', 'Raster'], ['String', 'Crop?']]
+        in_rasters.filters[1].type = 'ValueList'
+        in_rasters.filters[1].list = ['No', 'Yes']
+        in_rasters.values[1] = 'No'
+
+        in_subdivision = arcpy.Parameter(
+            displayName="Input mosaic polygons",
+            name="in_subdivision",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        out_raster = arcpy.Parameter(
+            displayName="Input raster DEMs",
+            name="out_raster",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Output")
+
+        params = [in_rasters, in_subdivision, out_raster]
+        return params
+
+    def isLicensed(self):
+        return True
+
+    def updateParameters(self, parameters):
+        return
+
+    def updateMessages(self, parameters):
+        return
+
+    def execute(self, parameters, messages):
+        try:
+            # Get input parameters
+            in_rasters = parameters[0].valueAsText
+            in_subdivision = parameters[1].valueAsText
+            out_raster = parameters[2].valueAsText
+
+            MD.execute(in_rasters, in_subdivision, out_raster)
+        except:
+            tb = sys.exc_info()[2]
+            tbinfo = traceback.format_tb(tb)[0]
+            pymsg = "Traceback Info:\n" + tbinfo + "\nError Info:\n    " + \
+                    str(sys.exc_type) + ": " + str(sys.exc_value) + "\n"
+            arcpy.AddError(pymsg)
         return
 
 class FilterDEM(object):

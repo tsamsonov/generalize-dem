@@ -525,12 +525,16 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         instreamslyr = 'strlyr'
         arcpy.MakeFeatureLayer_management(instreams, instreamslyr)
 
-        arcpy.AddMessage('CALCULATING EUCLIDEAN DISTANCE RASTERS...')
+
+        arcpy.AddMessage('CALCULATING EUCLIDEAN DISTANCE RASTERS...' + str(datetime.now()))
+
         for i in range(n):
             arcpy.SelectLayerByAttribute_management(instreamslyr, 'NEW_SELECTION',
                                                     '"' + inIDfield + '" = ' + str(ordids[i]))
             euc = arcpy.sa.EucDistance(instreamslyr, cell_size=cellsize)
             eucs[i, :, :] = arcpy.RasterToNumPyArray(euc)
+
+        arcpy.AddMessage('START AND ENDPOINTS...' + str(datetime.now()))
 
         idx = numpy.zeros(n).astype(int)
 
@@ -557,7 +561,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
         extinraster = extend_array(inraster, 1, 1, 0)
 
-        arcpy.AddMessage("TRACING COUNTERPARTS...")
+        arcpy.AddMessage("TRACING COUNTERPARTS..." + str(datetime.now()))
 
         arcpy.SetProgressor("step", "Processing rivers", 0, n - 1, 1)
 
@@ -790,6 +794,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         arcpy.AddMessage('Total flowline time: ' + str(fsum))
         arcpy.AddMessage('Total least cost time: ' + str(lsum))
 
+        arcpy.AddMessage("GENERATING VECTOR AND RASTER OUTPUT..." + str(datetime.now()))
+
         outraster = None
         nodatavalue = 0 if (min(ordids) > 0) else min(ordids) - 1
 
@@ -829,7 +835,7 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
         arcpy.AddField_management(outstreams, 'quality', 'TEXT', field_length=16)
 
         # ensure right direction
-        arcpy.AddMessage('ENSURING RIGHT DIRECTION AND ASSESSING THE QUALITY...')
+        arcpy.AddMessage('ENSURING RIGHT DIRECTION AND ASSESSING THE QUALITY...' + str(datetime.now()))
 
         with  arcpy.da.UpdateCursor(outstreams, ["SHAPE@", 'grid_code', 'frechet_dist', 'hausdorff_dist', 'dir_hausdorff_dist', 'quality']) as rows:
             for row in rows:
@@ -862,6 +868,8 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
                 else:
                     row[5] = 'Weak'
                 rows.updateRow(row)
+
+        arcpy.AddMessage('END...' + str(datetime.now()))
         return
 
     except:
@@ -874,6 +882,9 @@ def process_raster(instreams, inIDfield, in_raster, minacc, radius, deviation, d
 
 def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, penalty, radius, deviation, limit):
     global MAXACC
+
+    arcpy.AddMessage('START: ' + str(datetime.now()))
+
     MAXACC = float(str(arcpy.GetRasterProperties_management(inraster, "MAXIMUM")))
     desc = arcpy.Describe(inraster)
     lowerleft = arcpy.Point(desc.extent.XMin, desc.extent.YMin)
@@ -886,6 +897,8 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
     instreams_crop = 'in_memory/str_cropped'
     arcpy.Clip_analysis(in_streams, domain, instreams_crop)
     ids = get_values(instreams_crop, inIDfield)
+
+    arcpy.AddMessage('ORDERING: ' + str(datetime.now()))
 
     # Get start and endpoints of rivers
     startpts = 'in_memory/startpts'
@@ -963,6 +976,8 @@ def execute(in_streams, inIDfield, inraster, demRaster, outstreams, minacc, pena
             depstarts = depstarts[not_ord]
 
             i += 1
+
+    arcpy.AddMessage('PROCESSING: ' + str(datetime.now()))
 
     process_raster(instreams_crop, inIDfield, inraster, minacc, radius, deviation, demRaster, penalty,
                    startpts, endpts, ids, ordids, ordends, ordstarts, lowerleft, cellsize, crs, outstreams, limit)

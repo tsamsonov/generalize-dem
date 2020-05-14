@@ -5,6 +5,7 @@ import traceback
 import math
 import numpy
 from arcpy.sa import *
+from datetime import datetime
 
 shift = []
 window = []
@@ -64,7 +65,7 @@ def execute(in_raster, in_streams, in_field, out_raster):
 
     npdem = arcpy.RasterToNumPyArray(in_raster, ncols = ncols, nrows = nrows)
 
-    arcpy.AddMessage('RASTERIZING STREAMS')
+    arcpy.AddMessage('RASTERIZING STREAMS' + str(datetime.now()))
 
     with arcpy.da.SearchCursor(in_streams, in_field) as rows:
         for row in rows:
@@ -89,7 +90,7 @@ def execute(in_raster, in_streams, in_field, out_raster):
 
             features.append(feature)
 
-    arcpy.AddMessage('CARVING')
+    arcpy.AddMessage('CARVING' + str(datetime.now()))
 
     finished = False
 
@@ -144,6 +145,8 @@ def execute(in_raster, in_streams, in_field, out_raster):
     arcpy.DefineProjection_management(outraster, crs)
 
     outraster.save(out_raster)
+
+    arcpy.AddMessage('END' + str(datetime.now()))
 
     return
 

@@ -7,6 +7,7 @@ import sys
 import traceback
 from arcpy.sa import *
 import ScratchWorkspace as SW
+from datetime import datetime
 
 __author__ = 'Timofey Samsonov'
 
@@ -18,11 +19,11 @@ def execute(in_raster, in_links, in_area, distance, out_raster):
 
     scratchworkspace = SW.CreateScratchWorkspace(workspace)
 
-    arcpy.AddMessage("Converting raster to points...")
+    arcpy.AddMessage("Converting raster to points..." + str(datetime.now()))
     dempts = 'in_memory/dempts'
     arcpy.RasterToPoint_conversion(in_raster, dempts)
 
-    arcpy.AddMessage("Preparing points and links...")
+    arcpy.AddMessage("Preparing points and links..." + str(datetime.now()))
     buf = 'in_memory/buf'
     arcpy.Buffer_analysis(in_area, buf, distance, dissolve_option='ALL')
     arcpy.Densify_edit(buf, 'DISTANCE', cellsize)
@@ -37,10 +38,14 @@ def execute(in_raster, in_links, in_area, distance, out_raster):
     confpts = 'in_memory/confpts'
     arcpy.CopyFeatures_management(ptslyr, confpts)
 
-    arcpy.AddMessage("Rubbersheeting...")
+    # arcpy.CopyFeatures_management(ptslyr, 'X:/DEMGEN/Test.gdb/confpts')
+
+    arcpy.AddMessage("Rubbersheeting..." + str(datetime.now()))
     arcpy.RubbersheetFeatures_edit(confpts, in_links, identity_links, 'NATURAL_NEIGHBOR')
 
-    arcpy.AddMessage("Triangulation...")
+    # arcpy.CopyFeatures_management(confpts, 'X:/DEMGEN/Test.gdb/confpts_confl')
+
+    arcpy.AddMessage("Triangulation..."+ str(datetime.now()))
     arcpy.SelectLayerByAttribute_management(ptslyr, 'SWITCH_SELECTION')
 
     features = []
@@ -51,7 +56,7 @@ def execute(in_raster, in_links, in_area, distance, out_raster):
     tin = scratchworkspace + '/tin'
     arcpy.CreateTin_3d(tin, crs, featurestring)
 
-    arcpy.AddMessage("Converting to output raster...")
+    arcpy.AddMessage("Converting to output raster..." + str(datetime.now()))
     arcpy.env.extent = desc.extent  # Very important!
     arcpy.env.snapRaster = in_raster
 
@@ -60,6 +65,8 @@ def execute(in_raster, in_links, in_area, distance, out_raster):
     except:
         arcpy.AddMessage("Failed to rasterize TIN using NATURAL_NEIGHBORS method. Switching to linear")
         arcpy.TinRaster_3d(tin, out_raster, "FLOAT", "LINEAR", "CELLSIZE " + str(cellsize), 1)
+
+    arcpy.AddMessage("END..." + str(datetime.now()))
 
 if __name__ == "__main__":
     try:
