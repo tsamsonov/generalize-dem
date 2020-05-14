@@ -26,7 +26,7 @@ class Toolbox(object):
         self.alias = ""
 
         # List of tool classes associated with this toolbox
-        self.tools = [CreateFishnet, CarveDEM, CalculateLineDistances, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
+        self.tools = [CreateFishnet, CarveDEM, CalculateLineDistances, ExtractStreams, CounterpartStreams, GenerateConflationLinks, FilterDEM, MosaicDEM, WidenLandforms, GeneralizeDEM, ConflateDEMbyLinks]
 
 class CreateFishnet(object):
 
@@ -379,12 +379,26 @@ class MosaicDEM(object):
         in_rasters.columns = [['GPRasterLayer', 'Raster'], ['String', 'Crop?']]
         in_rasters.filters[1].type = 'ValueList'
         in_rasters.filters[1].list = ['No', 'Yes']
-        in_rasters.values[1] = 'No'
 
         in_subdivision = arcpy.Parameter(
             displayName="Input mosaic polygons",
             name="in_subdivision",
             datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input")
+
+        in_field = arcpy.Parameter(
+            displayName="Order field",
+            name="in_field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input")
+        in_field.parameterDependencies = [in_subdivision.name]
+
+        in_overlap = arcpy.Parameter(
+            displayName="Overlap distance",
+            name="in_overlap",
+            datatype="GPDouble",
             parameterType="Required",
             direction="Input")
 
@@ -395,13 +409,14 @@ class MosaicDEM(object):
             parameterType="Required",
             direction="Output")
 
-        params = [in_rasters, in_subdivision, out_raster]
+        params = [in_rasters, in_subdivision, in_field, in_overlap, out_raster]
         return params
 
     def isLicensed(self):
         return True
 
     def updateParameters(self, parameters):
+
         return
 
     def updateMessages(self, parameters):
@@ -412,9 +427,11 @@ class MosaicDEM(object):
             # Get input parameters
             in_rasters = parameters[0].valueAsText
             in_subdivision = parameters[1].valueAsText
-            out_raster = parameters[2].valueAsText
+            in_field = parameters[2].valueAsText
+            in_overlap = float(parameters[3].valueAsText)
+            out_raster = parameters[4].valueAsText
 
-            MD.execute(in_rasters, in_subdivision, out_raster)
+            MD.execute(in_rasters, in_subdivision, in_field, in_overlap, out_raster)
         except:
             tb = sys.exc_info()[2]
             tbinfo = traceback.format_tb(tb)[0]
