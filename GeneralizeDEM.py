@@ -24,7 +24,9 @@ def call(oid,
          demdataset,
          flowdir,
          flowacc,
-         marine,
+         flines,
+         fpolys,
+         cliparea,
          fishbuffer,
          minacc1,
          minlen1,
@@ -81,28 +83,38 @@ def call(oid,
         while cell[1] != oid:
             cell = cells.next()
 
-        marine_area = None
+        land_area = None
         process_marine = False
-        marine_3d = workspace + "/marine_3d"
+        clip_3d = workspace + "/clip_3d"
         cell_erased = workspace + "/cell_erased" + str(i)
 
-        if marine:
-            arcpy.AddMessage("Extracting marine area...")
-            marine_area = workspace + "/land" + str(i)
-            arcpy.Clip_analysis(marine, cell[0], marine_area)
-            if arcpy.Exists(marine_area):
-                if int(arcpy.GetCount_management(marine_area).getOutput(0)) > 0:
-                    arcpy.Erase_analysis(cell[0], marine_area, cell_erased)
+        if cliparea:
+            arcpy.AddMessage("Clipping generalization area...")
+            land_area = workspace + "/land" + str(i)
+            arcpy.Clip_analysis(cliparea, cell[0], land_area)
+            if arcpy.Exists(land_area):
+                if int(arcpy.GetCount_management(land_area).getOutput(0)) > 0:
+                    arcpy.Clip_analysis(cell[0], cliparea, cell_erased)
+                    dem = ExtractByMask(dem0, cell_erased)
+                    dem.save(rastertinworkspace + '/' + raster + "_e.tif")
+                    dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e.tif")
+                    arcpy.InterpolateShape_3d(demdataset, land_area, clip_3d, vertices_only=True)
 
-                    nareas = 0
-                    if arcpy.Exists(cell_erased):
-                        nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
+                    process_marine = True
 
-                    if nareas == 0:
-                        arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely in the marine area. Finishing...\n')
-
+                    # nareas = 0
+                    # if arcpy.Exists(cell_erased):
+                    #     nareas = int(arcpy.GetCount_management(cell_erased).getOutput(0))
+                    #
+                    # if nareas == 0:
+                else:
+                    arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely outside clipping area. Finishing...\n')
+                    return True
+            else:
+                arcpy.AddMessage('\nNOTHING TO GENERALIZE: The tile is completely outside clipping area. Finishing...\n')
+                return True
                         # arcpy.AddMessage("CLEANING MAIN DATA")
-                        # arcpy.Delete_management(marine_area)
+                        # arcpy.Delete_management(land_area)
                         # arcpy.Delete_management(cell_erased)
                         # arcpy.Delete_management(workspace)
                         # arcpy.Delete_management(rastertinworkspace)
@@ -110,15 +122,6 @@ def call(oid,
                         # arcpy.CheckInExtension("3D")
                         # arcpy.CheckInExtension("Spatial")
 
-                        return True
-                    else:
-                        dem = ExtractByMask(dem0, cell_erased)
-                        dem.save(rastertinworkspace + '/' + raster + "_e.tif")
-                        dem = arcpy.Raster(rastertinworkspace + '/' + raster + "_e.tif")
-
-                        arcpy.InterpolateShape_3d(demdataset, marine_area, marine_3d, vertices_only=True)
-
-                        process_marine = True
 
         cellsize = dem.meanCellHeight
 
@@ -381,7 +384,7 @@ def call(oid,
             features.append(w2)
             features.append(b)
             if process_marine:
-                m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
+                m2 = "'" + clip_3d + "' Shape.Z " + "hardline"
                 features.append(m2)
 
             # arcpy.AddMessage("CLEANING SUPPLEMENTARY DATA")
@@ -425,7 +428,7 @@ def call(oid,
             features.append(b)
 
             if process_marine:
-                m2 = "'" + marine_3d + "' Shape.Z " + "hardline"
+                m2 = "'" + clip_3d + "' Shape.Z " + "hardline"
                 features.append(m2)
 
             # Temporarily deprecated in favour of Basin Tool
@@ -434,10 +437,22 @@ def call(oid,
             # arcpy.RasterTin_3d(dem0, tin, zTol)
             #
             # if process_marine:
-            #     features = [[marine_3d, 'Shape', '<None>', 'hardline', True]]
+            #     features = [[clip_3d, 'Shape', '<None>', 'hardline', True]]
             #     arcpy.EditTin_3d(tin, features)
 
             stream_processing = False
+
+        if flines:
+            flines_3d = workspace + "/flines_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, flines, flines_3d)
+            f = "'" + flines_3d + "' Shape.Z " + "softline"
+            features.append(f)
+
+        if fpolys:
+            fpolys_3d = workspace + "/fpolys_3d"
+            arcpy.InterpolateShape_3d(dem0.path + '/' + dem0.name, fpolys, fpolys_3d)
+            f = "'" + fpolys_3d + "' Shape.Z " + "softreplace"
+            features.append(f)
 
         featurestring = ';'.join(features)
         arcpy.ddd.CreateTin(tin, "", featurestring, "")
@@ -460,7 +475,7 @@ def call(oid,
         if is_widen and stream_processing:
             arcpy.AddMessage("Raster widening...")
             widenraster = rastertinworkspace + "/widenraster.tif"
-            WidenLandforms.execute(rastertin, streams1, widendist, filtersize, widenraster, widentype)
+            WidenLandforms.execute(rastertin, streams1, widendist, filtersize, widenraster, widentype, True)
 
         # Smooth DEM
         result = arcpy.Raster(widenraster)
@@ -530,10 +545,12 @@ def call(oid,
         return False
 
 def execute(demdataset,
+            output,
             flowdir,
             flowacc,
-            marine,
-            output,
+            flines,
+            fpolys,
+            cliparea,
             outputcellsize,
             minacc1,
             minlen1,
@@ -701,20 +718,22 @@ def execute(demdataset,
             pool = multiprocessing.Pool(nproc)
 
             args = zip(oids, repeat(demdataset),
-                             repeat(flowdir),
-                             repeat(flowacc),
-                             repeat(marine),
-                             repeat(fishbuffer),
-                             repeat(minacc1),
-                             repeat(minlen1),
-                             repeat(minacc2),
-                             repeat(minlen2),
-                             repeat(is_widen),
-                             repeat(widentype),
-                             repeat(widendist),
-                             repeat(filtersize),
-                             repeat(is_smooth),
-                             repeat(scratchworkspace))
+                       repeat(flowdir),
+                       repeat(flowacc),
+                       repeat(flines),
+                       repeat(fpolys),
+                       repeat(cliparea),
+                       repeat(fishbuffer),
+                       repeat(minacc1),
+                       repeat(minlen1),
+                       repeat(minacc2),
+                       repeat(minlen2),
+                       repeat(is_widen),
+                       repeat(widentype),
+                       repeat(widendist),
+                       repeat(filtersize),
+                       repeat(is_smooth),
+                       repeat(scratchworkspace))
 
             results = pool.map(call_list, args)
 
@@ -734,21 +753,23 @@ def execute(demdataset,
             arcpy.AddMessage('')
             for oid in oids:
                 jobs.append(call(oid,
-                             demdataset,
-                             flowdir,
-                             flowacc,
-                             marine,
-                             fishbuffer,
-                             minacc1,
-                             minlen1,
-                             minacc2,
-                             minlen2,
-                             is_widen,
-                             widentype,
-                             widendist,
-                             filtersize,
-                             is_smooth,
-                             scratchworkspace))
+                                 demdataset,
+                                 flowdir,
+                                 flowacc,
+                                 flines,
+                                 fpolys,
+                                 cliparea,
+                                 fishbuffer,
+                                 minacc1,
+                                 minlen1,
+                                 minacc2,
+                                 minlen2,
+                                 is_widen,
+                                 widentype,
+                                 widendist,
+                                 filtersize,
+                                 is_smooth,
+                                 scratchworkspace))
             falseoids = []
             for state, oid in zip(jobs, oids):
                 if state == False:
@@ -813,29 +834,31 @@ def execute(demdataset,
 if __name__ == '__main__':
 
     demdataset = arcpy.GetParameterAsText(0)
-    flowdir = arcpy.GetParameterAsText(1)
-    flowacc = arcpy.GetParameterAsText(2)
-    marine = arcpy.GetParameterAsText(3)
-    output = arcpy.GetParameterAsText(4)
-    outputcellsize = float(arcpy.GetParameterAsText(5))
-    minacc1 = int(arcpy.GetParameterAsText(6))
-    minlen1 = int(arcpy.GetParameterAsText(7))
-    minacc2 = int(arcpy.GetParameterAsText(8))
-    minlen2 = int(arcpy.GetParameterAsText(9))
-    is_widen = True if arcpy.GetParameterAsText(10) == 'true' else False
-    widentype = arcpy.GetParameterAsText(11)
-    widendist = float(arcpy.GetParameterAsText(12))
-    filtersize = int(arcpy.GetParameterAsText(13))
-    is_smooth = True if arcpy.GetParameterAsText(14) == 'true' else False
-    is_tiled = True if arcpy.GetParameterAsText(15) == 'true' else False
-    tile_size = arcpy.GetParameterAsText(16)
-    is_parallel = True if arcpy.GetParameterAsText(17) == 'true' else False
-    num_processes = int(arcpy.GetParameterAsText(18))
-    is_continued = True if arcpy.GetParameterAsText(19) == 'true' else False
-    continued_folder = arcpy.GetParameterAsText(20)
+    output = arcpy.GetParameterAsText(1)
+    flowdir = arcpy.GetParameterAsText(2)
+    flowacc = arcpy.GetParameterAsText(3)
+    flines = arcpy.GetParameterAsText(4)
+    fpolys = arcpy.GetParameterAsText(5)
+    cliparea = arcpy.GetParameterAsText(6)
+    outputcellsize = float(arcpy.GetParameterAsText(7))
+    minacc1 = int(arcpy.GetParameterAsText(8))
+    minlen1 = int(arcpy.GetParameterAsText(9))
+    minacc2 = int(arcpy.GetParameterAsText(10))
+    minlen2 = int(arcpy.GetParameterAsText(11))
+    is_widen = True if arcpy.GetParameterAsText(12) == 'true' else False
+    widentype = arcpy.GetParameterAsText(13)
+    widendist = float(arcpy.GetParameterAsText(14))
+    filtersize = int(arcpy.GetParameterAsText(15))
+    is_smooth = True if arcpy.GetParameterAsText(16) == 'true' else False
+    is_tiled = True if arcpy.GetParameterAsText(17) == 'true' else False
+    tile_size = arcpy.GetParameterAsText(18)
+    is_parallel = True if arcpy.GetParameterAsText(19) == 'true' else False
+    num_processes = int(arcpy.GetParameterAsText(20))
+    is_continued = True if arcpy.GetParameterAsText(21) == 'true' else False
+    continued_folder = arcpy.GetParameterAsText(22)
 
-    execute(demdataset, flowdir, flowacc, marine, output, outputcellsize,
-            minacc1, minlen1, minacc2, minlen2,
+    execute(demdataset, output, flowdir, flowacc, flines, fpolys, cliparea,
+            outputcellsize, minacc1, minlen1, minacc2, minlen2,
             is_widen, widentype, widendist, filtersize,
             is_smooth, is_tiled, tile_size, is_parallel, num_processes,
             is_continued, continued_folder)

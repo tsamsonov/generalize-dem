@@ -864,31 +864,7 @@ class GeneralizeDEM(object):
             datatype="GPRasterLayer",
             parameterType="Required",
             direction="Input")
-        demdataset.category = '1. Input and output'
-
-        flowdir = arcpy.Parameter(
-            displayName="Input flow direction raster",
-            name="flowdir",
-            datatype="GPRasterLayer",
-            parameterType="Optional",
-            direction="Input")
-        flowdir.category = '1. Input and output'
-
-        flowacc = arcpy.Parameter(
-            displayName="Input flow accumulation raster",
-            name="flowacc",
-            datatype="GPRasterLayer",
-            parameterType="Optional",
-            direction="Input")
-        flowacc.category = '1. Input and output'
-
-        marine = arcpy.Parameter(
-            displayName="Marine area polygon feature layer",
-            name="marine",
-            datatype="GPFeatureLayer",
-            parameterType="Optional",
-            direction="Input")
-        marine.category = '1. Input and output'
+        demdataset.category = '1. Input and output DEM'
 
         output = arcpy.Parameter(
             displayName="Output raster DEM",
@@ -896,7 +872,47 @@ class GeneralizeDEM(object):
             datatype="DERasterDataset",
             parameterType="Required",
             direction="Output")
-        output.category = '1. Input and output'
+        output.category = '1. Input and output DEM'
+
+        flowdir = arcpy.Parameter(
+            displayName="Input flow direction raster",
+            name="flowdir",
+            datatype="GPRasterLayer",
+            parameterType="Optional",
+            direction="Input")
+        flowdir.category = '2. Supplementary input'
+
+        flowacc = arcpy.Parameter(
+            displayName="Input flow accumulation raster",
+            name="flowacc",
+            datatype="GPRasterLayer",
+            parameterType="Optional",
+            direction="Input")
+        flowacc.category = '2. Supplementary input'
+
+        flines = arcpy.Parameter(
+            displayName="Input linear features",
+            name="flines",
+            datatype="GPFeatureLayer",
+            parameterType="Optional",
+            direction="Input")
+        flines.category = '2. Supplementary input'
+
+        fpolys = arcpy.Parameter(
+            displayName="Input polygonal features",
+            name="fpolys",
+            datatype="GPFeatureLayer",
+            parameterType="Optional",
+            direction="Input")
+        fpolys.category = '2. Supplementary input'
+
+        cliparea = arcpy.Parameter(
+            displayName="Clip area",
+            name="cliparea",
+            datatype="GPFeatureLayer",
+            parameterType="Optional",
+            direction="Input")
+        cliparea.category = '2. Supplementary input'
 
         outputcellsize = arcpy.Parameter(
             displayName="Output cell size",
@@ -904,7 +920,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        outputcellsize.category = '2. Main parameters'
+        outputcellsize.category = '3. Main parameters'
         outputcellsize.value = 1000
 
         minacc1 = arcpy.Parameter(
@@ -913,7 +929,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        minacc1.category = '2. Main parameters'
+        minacc1.category = '3. Main parameters'
         minacc1.value = 40
 
         minlen1 = arcpy.Parameter(
@@ -922,7 +938,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        minlen1.category = '2. Main parameters'
+        minlen1.category = '3. Main parameters'
         minlen1.value = 40
 
         minacc2 = arcpy.Parameter(
@@ -931,7 +947,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        minacc2.category = '2. Main parameters'
+        minacc2.category = '3. Main parameters'
         minacc2.value = 20
 
         minlen2 = arcpy.Parameter(
@@ -940,7 +956,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Required",
             direction="Input")
-        minlen2.category = '2. Main parameters'
+        minlen2.category = '3. Main parameters'
         minlen2.value = 10
 
         is_widen = arcpy.Parameter(
@@ -949,7 +965,7 @@ class GeneralizeDEM(object):
             datatype="GPBoolean",
             parameterType="Optional",
             direction="Input")
-        is_widen.category = '3. Widening and smoothing'
+        is_widen.category = '4. Widening and smoothing'
         is_widen.value = 'true'
 
         widentype = arcpy.Parameter(
@@ -958,7 +974,7 @@ class GeneralizeDEM(object):
             datatype="GPString",
             parameterType="Optional",
             direction="Input")
-        widentype.category = '3. Widening and smoothing'
+        widentype.category = '4. Widening and smoothing'
         widentype.filter.list = ['Min/Max', 'Lower/Upper Quartile']
         widentype.value = 'Min/Max'
 
@@ -968,7 +984,7 @@ class GeneralizeDEM(object):
             datatype="GPDouble",
             parameterType="Optional",
             direction="Input")
-        widendist.category = '3. Widening and smoothing'
+        widendist.category = '4. Widening and smoothing'
         widendist.value = 8000
 
         filtersize = arcpy.Parameter(
@@ -977,7 +993,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Optional",
             direction="Input")
-        filtersize.category = '3. Widening and smoothing'
+        filtersize.category = '4. Widening and smoothing'
         filtersize.value = 3
 
         is_smooth = arcpy.Parameter(
@@ -986,7 +1002,7 @@ class GeneralizeDEM(object):
             datatype="GPBoolean",
             parameterType="Optional",
             direction="Input")
-        is_smooth.category = '3. Widening and smoothing'
+        is_smooth.category = '4. Widening and smoothing'
         is_smooth.value = 'false'
 
         is_tiled = arcpy.Parameter(
@@ -995,7 +1011,7 @@ class GeneralizeDEM(object):
             datatype="GPBoolean",
             parameterType="Optional",
             direction="Input")
-        is_tiled.category = '4. Tiling and parallel processing'
+        is_tiled.category = '5. Tiling and parallel processing'
         is_tiled.value = 'false'
 
         tile_size = arcpy.Parameter(
@@ -1004,7 +1020,7 @@ class GeneralizeDEM(object):
             datatype="GPLong",
             parameterType="Optional",
             direction="Input")
-        tile_size.category = '4. Tiling and parallel processing'
+        tile_size.category = '5. Tiling and parallel processing'
         tile_size.value = 2048
 
         is_parallel = arcpy.Parameter(
@@ -1013,7 +1029,7 @@ class GeneralizeDEM(object):
             datatype="GPBoolean",
             parameterType="Optional",
             direction="Input")
-        is_parallel.category = '4. Tiling and parallel processing'
+        is_parallel.category = '5. Tiling and parallel processing'
         is_parallel.value = 'false'
 
         num_processes = arcpy.Parameter(
@@ -1022,7 +1038,7 @@ class GeneralizeDEM(object):
             datatype="GPDouble",
             parameterType="Optional",
             direction="Input")
-        num_processes.category = '4. Tiling and parallel processing'
+        num_processes.category = '5. Tiling and parallel processing'
         num_processes.value = 0
 
         is_continued = arcpy.Parameter(
@@ -1031,7 +1047,7 @@ class GeneralizeDEM(object):
             datatype="GPBoolean",
             parameterType="Optional",
             direction="Input")
-        is_continued.category = '5. Continue previous processing'
+        is_continued.category = '6. Continue previous processing'
         is_continued.value = 'false'
 
         continued_folder = arcpy.Parameter(
@@ -1042,7 +1058,8 @@ class GeneralizeDEM(object):
             direction="Input")
         continued_folder.category = '5. Continue previous processing'
 
-        params = [demdataset, flowdir, flowacc, marine, output, outputcellsize, minacc1, minlen1, minacc2, minlen2,
+        params = [demdataset, output, flowdir, flowacc, flines, fpolys, cliparea,
+                  outputcellsize, minacc1, minlen1, minacc2, minlen2,
                   is_widen, widentype, widendist, filtersize, is_smooth, is_tiled, tile_size,
                   is_parallel, num_processes, is_continued, continued_folder]
         return params
@@ -1063,32 +1080,36 @@ class GeneralizeDEM(object):
 
     def execute(self, parameters, messages):
         demdataset = parameters[0].valueAsText
-        flowdir = parameters[1].valueAsText
-        flowacc = parameters[2].valueAsText
-        marine = parameters[3].valueAsText
-        output = parameters[4].valueAsText
-        outputcellsize = float(parameters[5].valueAsText)
-        minacc1 = int(parameters[6].valueAsText)
-        minlen1 = int(parameters[7].valueAsText)
-        minacc2 = int(parameters[8].valueAsText)
-        minlen2 = int(parameters[9].valueAsText)
-        is_widen = True if parameters[10].valueAsText == 'true' else False
-        widentype = parameters[11].valueAsText
-        widendist = float(parameters[12].valueAsText)
-        filtersize = int(parameters[13].valueAsText)
-        is_smooth = True if parameters[14].valueAsText == 'true' else False
-        is_tiled = True if parameters[15].valueAsText == 'true' else False
-        tile_size = int(parameters[16].valueAsText)
-        is_parallel = True if parameters[17].valueAsText == 'true' else False
-        num_processes = float(parameters[18].valueAsText)
-        is_continued = True if parameters[19].valueAsText == 'true' else False
-        continued_folder = parameters[20].valueAsText
+        output = parameters[1].valueAsText
+        flowdir = parameters[2].valueAsText
+        flowacc = parameters[3].valueAsText
+        flines = parameters[4].valueAsText
+        fpolys = parameters[5].valueAsText
+        cliparea = parameters[6].valueAsText
+        outputcellsize = float(parameters[7].valueAsText)
+        minacc1 = int(parameters[8].valueAsText)
+        minlen1 = int(parameters[9].valueAsText)
+        minacc2 = int(parameters[10].valueAsText)
+        minlen2 = int(parameters[11].valueAsText)
+        is_widen = True if parameters[12].valueAsText == 'true' else False
+        widentype = parameters[13].valueAsText
+        widendist = float(parameters[14].valueAsText)
+        filtersize = int(parameters[15].valueAsText)
+        is_smooth = True if parameters[16].valueAsText == 'true' else False
+        is_tiled = True if parameters[17].valueAsText == 'true' else False
+        tile_size = int(parameters[18].valueAsText)
+        is_parallel = True if parameters[19].valueAsText == 'true' else False
+        num_processes = float(parameters[20].valueAsText)
+        is_continued = True if parameters[21].valueAsText == 'true' else False
+        continued_folder = parameters[22].valueAsText
 
         GD.execute(demdataset,
+                   output,
                    flowdir,
                    flowacc,
-                   marine,
-                   output,
+                   flines,
+                   fpolys,
+                   cliparea,
                    outputcellsize,
                    minacc1,
                    minlen1,
