@@ -60,4 +60,8 @@ To cite the software use the following reference:
 
 *Samsonov, T.*, 2020. Generalize DEM: ArcGIS Python toolbox for automated structural generalization and conflation of digital elevation models. **Zenodo**. DOI:[-](-)
 
+## Funding 
+
+Development of this software is funded by Russian Science Foundation (RSF) grant No 19-77-00071
+
 © 2010-2020, Timofey Samsonov, Lomonosov MSU Faculty of Geography.
