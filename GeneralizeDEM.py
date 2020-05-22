@@ -160,7 +160,8 @@ def call(oid,
             str1 = SetNull(str1_0, 1, "value = 0")
 
             arcpy.AddMessage("Vectorizing streams...")
-            StreamToFeature(str1, dir, streams1, False)
+            # StreamToFeature(str1, dir, streams1, False)
+            arcpy.RasterToPolyline_conversion(str1, streams1)
 
             arcpy.AddMessage("Deriving endpoints...")
             endpoints1 = workspace + "/endpoints1"
@@ -190,7 +191,8 @@ def call(oid,
 
             arcpy.AddMessage("Vectorizing erased streams...")
             streams1_e = workspace + "/streams1_e"
-            StreamToFeature(str1_e, dir, streams1_e, False)
+            # StreamToFeature(str1_e, dir, streams1_e, False)
+            arcpy.RasterToPolyline_conversion(str1_e, streams1_e)
 
             arcpy.AddMessage("Deriving erased endpoints...")
             endpoints1_e = workspace + "/endpoints1_e"
@@ -262,7 +264,8 @@ def call(oid,
 
             arcpy.AddMessage("Vectorizing streams...")
             streams2_e = workspace + "/streams2_e"
-            StreamToFeature(str2_e, dir, streams2_e, False)
+            # StreamToFeature(str2_e, dir, streams2_e, False)
+            arcpy.RasterToPolyline_conversion(str2_e, streams2_e)
 
             arcpy.AddMessage("Deriving endpoints...")
             endpoints2_e = workspace + "/endpoints2_e"
@@ -382,7 +385,7 @@ def call(oid,
             features.append(s1)
             features.append(w1)
             features.append(w2)
-            features.append(b)
+            # features.append(b)
             if process_marine:
                 m2 = "'" + clip_3d + "' Shape.Z " + "hardline"
                 features.append(m2)

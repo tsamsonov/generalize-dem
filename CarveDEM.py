@@ -88,6 +88,10 @@ def execute(in_raster, in_streams, in_field, out_raster):
 
             feature = cells[idx, :]
 
+            if npdem[feature[0][0], feature[0][1]] < npdem[feature[-1][0], feature[-1][1]]:
+                feature = numpy.flipud(feature)
+
+
             features.append(feature)
 
     arcpy.AddMessage('CARVING' + str(datetime.now()))
