@@ -50,9 +50,9 @@ You can find an example DEM in `dem.gdb` geodatabase (please unzip gdb before us
 
 A detailed description of the method can be found in the following papers:
 
-*Samsonov T.* Multiscale hypsometric mapping // **Advances in Cartography and GIScience, Vol. 1.** — Lecture Notes in Geoinformation and Cartography. — Springer: Heidelberg, Germany, 2011. — P. 497–520. DOI: [10.1007/978-3-642-19143-5_28](http://dx.doi.org/10.1007/978-3-642-19143-5_28)
+Samsonov, T. (2011) *Multiscale Hypsometric Mapping*, in Ruas, A. (ed.) **Advances in Cartography and GIScience. Vol.1: Selection from ICC-2011, Paris**. Berlin, Heidelberg: Springer (Lecture Notes in Geoinformation and Cartography), pp. 497–520. DOI: [10.1007/978-3-642-19143-5_28](http://dx.doi.org/10.1007/978-3-642-19143-5_28)
 
-*Samsonov T.* Automated Conflation of Digital Elevation Model With Reference Hydrographic Lines. *Under review*
+Samsonov, T. (2020) *Automated Conflation of Digital Elevation Model with Reference Hydrographic Lines*, **ISPRS International Journal of Geo-Information**, 9(5), 334. DOI: [10.3390/ijgi9050334](http://dx.doi.org/10.3390/ijgi9050334).
 
 ## Citation & Copyright
 
