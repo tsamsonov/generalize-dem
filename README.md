@@ -58,7 +58,7 @@ Samsonov, T. (2020) *Automated Conflation of Digital Elevation Model with Refere
 
 To cite the software use the following reference:
 
-*Samsonov, T.*, 2020. Generalize DEM: ArcGIS Python toolbox for automated structural generalization and conflation of digital elevation models. **Zenodo**. DOI:[10.5281/zenodo.3813731](https://doi.org/10.5281/zenodo.3813731)
+Samsonov, T. (2020). *Generalize DEM: ArcGIS Python toolbox for automated structural generalization and conflation of digital elevation models*. **Zenodo**. DOI: [10.5281/zenodo.3813731](https://doi.org/10.5281/zenodo.3813731)
 
 ## Funding 
 
